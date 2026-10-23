@@ -1,7 +1,8 @@
 """Database commands.
 
-  init      create (or recreate) all tables, empty
-  seed      load the committed synthetic dataset (data/seed.copy.gz) and take the Reset snapshot
+  init      create the tables if they do not exist yet (never drops data; safe to repeat)
+  seed      replace all data with the committed synthetic dataset (data/seed.copy.gz) and take the
+            Reset snapshot (recreates the tables, so repeating it never creates duplicates)
   generate  rebuild the dataset by replaying ~300 simulated days through the engines, then write
             data/seed.copy.gz (about 25 s on a local database; slow on a remote one)
   reset     restore the seeded snapshot (same as the Reset button in the app)
@@ -17,7 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 
-from db import Conn, DatabaseNotConfigured, connect, init_schema  # noqa: E402
+from db import Conn, DatabaseNotConfigured, connect, init_schema, schema_exists  # noqa: E402
 
 
 def main(cmd: str) -> None:
@@ -33,9 +34,15 @@ def main(cmd: str) -> None:
     conn = Conn(raw)
     try:
         if cmd == "init":
-            init_schema(conn)
-            raw.commit()
-            print("Tables created.")
+            # Safe to repeat: never drops existing tables or data. `seed` replaces the data.
+            if schema_exists(conn):
+                tables = conn.val("SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'")
+                rows = conn.val("SELECT count(*) FROM applications")
+                print(f"Tables already exist ({tables} tables, {rows} applications). Nothing changed.")
+            else:
+                init_schema(conn)
+                conn.commit()
+                print("Tables created (empty). Run `pnpm db:seed` to load the synthetic data.")
         elif cmd == "seed":
             from app.data.seed import generate, load
             from app.data.snapshot import DUMP_PATH
@@ -58,7 +65,7 @@ def main(cmd: str) -> None:
             from app.data.snapshot import restore
 
             restore(conn)
-            raw.commit()
+            conn.commit()
             print("Demo data restored from the seeded snapshot.")
     finally:
         raw.close()

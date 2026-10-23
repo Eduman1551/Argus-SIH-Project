@@ -9,7 +9,11 @@ const isWin = process.platform === "win32";
 
 function step(label, cmd, args, opts = {}) {
   console.log(`\n> ${label}`);
-  const r = spawnSync(cmd, args, { cwd: root, stdio: "inherit", shell: isWin, ...opts });
+  // pnpm and py are scripts/launchers on Windows and need a shell; pass one command string then
+  const useShell = opts.shell ?? isWin;
+  const r = useShell
+    ? spawnSync([cmd, ...args].join(" "), { cwd: root, stdio: "inherit", shell: true })
+    : spawnSync(cmd, args, { cwd: root, stdio: "inherit" });
   if (r.status !== 0) {
     console.error(`\nFailed: ${label}`);
     process.exit(r.status ?? 1);
