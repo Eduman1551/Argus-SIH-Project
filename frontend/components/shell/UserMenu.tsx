@@ -29,7 +29,7 @@ export function UserMenu({ user }: { user: SessionUser }) {
   const pick = async (id: number) => {
     setOpen(false);
     const u = await switchUser(id);
-    if (u) router.push(homeFor(u.role));
+    if (u && window.location.pathname !== homeFor(u.role)) router.push(homeFor(u.role));
   };
 
   return (

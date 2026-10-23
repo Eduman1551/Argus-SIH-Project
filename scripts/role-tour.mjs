@@ -20,7 +20,11 @@ const errors = [];
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
 page.on("pageerror", (e) => errors.push(String(e)));
 const network = [];
-page.on("requestfailed", (r) => network.push(`${r.method()} ${r.url()} failed: ${r.failure()?.errorText}`));
+// Next.js cancels an in-flight RSC fetch when a newer navigation replaces it (net::ERR_ABORTED); that is not a failure.
+page.on("requestfailed", (r) => {
+  if (r.failure()?.errorText === "net::ERR_ABORTED" && new URL(r.url()).searchParams.has("_rsc")) return;
+  network.push(`${r.method()} ${r.url()} failed: ${r.failure()?.errorText}`);
+});
 page.on("response", (r) => { if (r.status() >= 400) network.push(`${r.request().method()} ${r.url()} -> ${r.status()}`); });
 let apiCalls = 0;
 page.on("response", (r) => { if (new URL(r.url()).pathname.startsWith("/api/") && r.ok()) apiCalls += 1; });

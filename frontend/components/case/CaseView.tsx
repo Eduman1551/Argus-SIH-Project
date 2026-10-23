@@ -196,7 +196,7 @@ function DecisionBlock({ data }: { data: CaseDetail }) {
     <div className="flex items-start gap-3">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-tint text-brand"><Gavel size={17} /></span>
       <div className="text-[13.5px]">
-        <div className="text-[15px] font-semibold">{DECISION_TEXT[a.decision ?? ""]}</div>
+        <div className="text-[15px] font-semibold">Decision recorded: {DECISION_TEXT[a.decision ?? ""]}</div>
         <div className="mt-0.5">{a.decision_reason}</div>
         <div className="mt-1 text-[12.5px] text-ink-soft">Recorded by {a.decided_by_name} on <span className="mono">{fmtDate(a.decided_at)}</span>. Argus records decisions; it never makes them.</div>
       </div>

@@ -115,7 +115,7 @@ await step("SAC member records a recommendation", async () => {
 await step("EVC member confirms availability", async () => {
   await as("evc-1");
   await page.goto(`${base}/my-cases`);
-  await page.getByRole("link", { name: "Open" }).first().waitFor();
+  await page.getByRole("row", { name: /^Open visit for/ }).first().waitFor();
   const visits = (await (await page.request.get(`${base}/api/dashboard`)).json()).visits;
   const v = visits.find((x) => x.my_action === "Confirm your availability");
   await page.goto(`${base}/visits/${v.id}`);
@@ -128,9 +128,9 @@ await step("EVC member confirms availability", async () => {
 await step("bureau officer changes a time limit", async () => {
   await as("bureau-head");
   await page.goto(`${base}/settings/rules`);
-  await page.getByRole("tab", { name: "Time limits" }).click();
-  await page.locator('input[type="number"]').first().fill("8");
-  await click("Save");
+  const limits = page.locator("#limits");
+  await limits.locator('input[type="number"]').first().fill("8");
+  await limits.getByRole("button", { name: "Save" }).first().click();
   await expectText(/: 8 days\./);
 });
 
