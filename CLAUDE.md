@@ -39,7 +39,7 @@ Argus is **decision support and workflow automation only**. It never approves, r
 3. **Time is injected.** All deadline logic takes `now` from one platform clock (`backend/app/clock`). Never call `datetime.now()` inside rules. The clock is a **simulated clock** with "Advance 1 day / 7 days / 30 days" controls, so reminders and escalations can be demonstrated and tested.
 4. **Every state change writes an audit entry in the same transaction.** The audit log is append-only and hash-chained (each entry stores the hash of the previous one), with a "Verify audit chain" button.
 5. **The alert engine is idempotent.** One alert per (entity, rule, offset), enforced by a unique key. Running the engine twice never sends duplicates.
-6. **All data is synthetic and fictional.** Fictional institutions, no real colleges, officers or committee members. Label "SYNTHETIC DATA" and "Prototype, not an official AICTE system" in the UI and README. Paraphrase the APH, never copy it.
+6. **All data is synthetic and fictional.** Fictional institutions, no real colleges, officers or committee members. Say so plainly, without a banner: one muted footer line on every page ("Prototype · all data is synthetic"), a statement on the `/guide` page ("Prototype, not an official AICTE system", synthetic data, illustrative rules, humans decide), and the same in the README. Paraphrase the APH, never copy it.
 7. **No fake numbers.** Every KPI, count and timing comes from real data or a real run. Never hardcode results.
 8. **Serverless-safe from day one** (we deploy on Vercel): no WebSockets (use polling), no in-memory state that matters (all state in PostgreSQL), no background threads that outlive a request. See section 7.
 9. **Works offline.** The LLM is optional. Every LLM feature has a template-based fallback.
@@ -99,7 +99,7 @@ Users (Institution | Official | Committee)
 | `backend/db` | `schema.sql` and a small `psycopg` data-access layer (plain SQL) |
 | `frontend/` | Next.js portal |
 
-**Auth in v1 is a demo session, and we say so honestly.** Seeded demo users with a user picker (the role switcher in the top bar) and a signed session cookie. The backend still **enforces** scoped authorization on every route (institutions see only their own data, committees only assigned cases, only Bureau officers edit rules). Real login, SSO and password flows are future scope.
+**Auth in v1 is a demo session, and we say so honestly.** Seeded demo users with a user picker (the role switcher in the avatar menu of the navbar) and a signed session cookie. The backend still **enforces** scoped authorization on every route (institutions see only their own data, committees only assigned cases, only Bureau officers edit rules). Real login, SSO and password flows are future scope.
 
 ---
 
@@ -189,29 +189,42 @@ Show these on a Results / Performance page with a one-line plain explanation eac
 
 ## 9. Frontend / UX (this decides how it feels to SIH judges)
 
-Multi-page app (Next.js App Router), desktop-first, good at 1366x768 and 1920x1080 with no horizontal scroll. Each page has one purpose. Plain English. A page pattern like this: title, one-line description, at most one primary button, a dismissible "What to do here" box (remembered in localStorage), and a "Next: ..." button at the bottom. Empty states say what to do next, and loading uses skeletons. Technical terms stay out of main copy.
+Multi-page app (Next.js App Router), desktop-first, good at 1366x768 and 1920x1080 with no horizontal scroll, and nothing broken at 1024. Each page has one purpose. Plain English. A page pattern like this: a doc-style header (breadcrumbs, title, one-line description, at most one primary action on the right), a dismissible "What to do here" tip (remembered in localStorage), and a "Next: ..." link at the bottom. Empty states say what to do next, and loading uses skeletons. Technical terms stay out of main copy.
 
-**Theme: red and light-brown paper (light only).** It should feel like a good government paper file: warm, calm and official, not a generic SaaS blue.
+**Theme: "stone and pine" (light only).** Calm, precise and official, like a well-made product for a government office: warm stone background, white surfaces, deep pine as the one brand colour. Not a generic SaaS blue, and no paper textures.
 
 | Token | Value | Use |
 |---|---|---|
-| `--paper` | `#F3E9D8` | page background (warm light brown) |
-| `--paper-2` | `#EADCC3` | sidebar, table headers, hover |
-| `--card` | `#FBF6EC` | cards and panels (lighter sheet) |
-| `--ink` | `#3B2A1E` | main text (dark brown, never pure black) |
-| `--ink-soft` | `#6B5744` | secondary text |
-| `--line` | `#D6C3A3` | borders and dividers (tan) |
-| `--red` | `#B3262D` | primary buttons, links, active nav, key accents |
-| `--red-deep` | `#7E1B22` | headings accents, hover, escalated state |
-| `--red-tint` | `#F6DDD8` | selected rows, subtle highlights |
+| `--bg` | `#F6F5F1` | page background (warm stone) |
+| `--surface` | `#FFFFFF` | cards, tables, popovers |
+| `--surface-2` | `#FAF9F6` | table headers, hover, insets |
+| `--line` / `--line-strong` | `#E4E2DA` / `#D3D0C5` | hairlines, input borders |
+| `--ink` / `--ink-soft` | `#17201F` / `#5F6B68` | main and secondary text |
+| `--brand` / `--brand-hover` / `--brand-tint` | `#0F5E5A` / `#0B4A47` / `#E6F2F0` | primary buttons, links, active nav, focus ring, selected rows |
+| `--amber` / `--amber-ink` / `--amber-tint` | `#B7791F` / `#8A5A12` / `#FBF0DA` | due soon (fills use amber, text uses amber-ink) |
+| `--red` / `--red-ink` / `--red-tint` | `#C0392B` / `#A93226` / `#FBE4E0` | overdue |
+| `--maroon` / `--maroon-tint` | `#7A1F1A` / `#F4E4E2` | escalated (with a flag icon and L1/L2/L3) |
+| `--slate` | `#6B7775` | neutral / waiting |
 
-- **Status colours** (always paired with a text label or icon, never colour alone): on track `#5B7B3A` (olive green), due soon `#B7791F` (ochre), overdue `#B3262D` solid with the word OVERDUE, escalated `#7E1B22` with an icon and level (L1/L2/L3). Verified / closed uses olive green. Neutral / waiting uses `--ink-soft`.
-- **Look:** a very subtle paper grain on the page background (CSS or a tiny inline SVG noise, low opacity, no heavy images), cards like sheets with a thin tan border and soft warm shadow, small corner radius (6 to 8 px). Status badges can look like small rubber stamps (outlined, uppercase, slight letter spacing, no rotation that hurts reading). Tables look like ruled ledger paper (light row lines, tan header).
-- **Type:** headings in a serif (Source Serif 4) and body in Inter, both bundled locally via `next/font/local` so it works offline. Large readable text, a visible keyboard focus ring in red, and WCAG AA contrast on the paper background (check the red on paper and the ochre on paper).
-- **Charts (Recharts):** use the palette above. Ageing heat uses tan to red-deep. Stage bars use brown tints with red for overdue. Always label axes and values.
-- **Motion:** transform and opacity only after mount (never start content at opacity 0), and respect reduced motion.
+- **Status pills** are always paired with a text label or icon, never colour alone: on track and closed use pine, due soon amber, overdue red (solid with the word "Overdue" in dense tables), escalated maroon with a flag and level, waiting slate.
+- **Type:** Geist Sans for text and Geist Mono for numbers, dates, references and hashes, both bundled locally (the `geist` package) so it works offline. Scale: page title 28 to 32, section 18 to 20, body 14 to 15, caption 12. Tabular numerals in tables. WCAG AA contrast for all text (small text on tinted fills uses the `-ink` variants).
+- **Detailing:** hairline borders, 12 px radius on cards, a light shadow, a soft header wash behind page titles, 4/8 px spacing, a visible pine focus ring, geometric empty-state drawings. No emoji, no stock photos.
+- **Charts (Recharts):** a teal ramp for normal data; amber and red only for exceptions (due soon, overdue). Always label axes and values.
+- **Motion:** 150 to 250 ms, transform and opacity only, never starting content from opacity 0; numbers count up, the nav pill slides, drawers slide in, skeletons fade. Respect reduced motion.
 
-**Shell:** a fixed left sidebar (icons plus plain labels, collapsible to an icon rail with tooltips, remembers the choice, auto-collapses below 1280 px). It changes with the role. The top bar shows a "SYNTHETIC DATA / Prototype" banner, the **simulated clock** (date, and Advance +1 day / +7 days / +30 days, Reset), the **role switcher** (demo user picker), the notification bell with an unread count, and a connection indicator.
+**Shell:** no sidebar and no top banner. A sticky, floating **glass navbar** (about 1280 px wide, 14 to 16 px radius, backdrop blur with a solid fallback, more opaque on scroll) with: the Argus mark (two arcs and a dot), role-aware grouped navigation (Official: Overview, Cases, Monitoring, Insight, plus Configure for Bureau officers) with a sliding active pill, a search button for the **command palette (Ctrl+K)**, the **simulated clock chip** (date; popover with +1 day / +7 days / +30 days and Reset; a toast like "7 days advanced: 12 reminders sent, 3 items overdue, 1 escalated to L2"), the notification bell popover, and the avatar menu with the demo **role switcher**. A hamburger sheet replaces the nav below 1024 px. A muted footer on every page: "Prototype · all data is synthetic", the version, and links to the Guide and README.
+
+**Signature elements**
+
+1. **Process line** on the Official dashboard: Intake, Scrutiny, Deficiency, Re-scrutiny, EVC, Committee, Decision as stations with counts, overdue counts and one ageing dot per case; clicking a station filters the case list below.
+2. **Deadline heat calendar** (90 days) on the Official dashboard and Institution home: undertakings, document expiries and visits on a teal ramp, items due within 7 days outlined in amber, and a today marker that moves with the simulated clock.
+3. **SLA bar** in case lists and on the case page: time used against the limit, reminder ticks, the due marker, and time waiting on the institution hatched (paused).
+4. **Case timeline:** a vertical ledger of audit events with icons, mono timestamps, who did it, and a copyable 8-character hash chip; new events highlight softly.
+5. **Region tile map:** the seven Regions as tiles laid out like the map, shaded by pendency or overdue; clicking scopes the dashboard.
+6. **Professional tables:** dense, sticky headers, tabular numerals, pills, initials avatars, hover and keyboard row navigation, a side-sheet quick look, removable filter chips.
+7. **Escalation ladder** (Escalations page and case page): L1 to L3, who was alerted and when, and the next level with a countdown.
+8. **Doc-style long pages** (Guide, Performance, Rules, case page) with a sticky "On this page" list, scroll-spy and callouts.
+9. **Rules page:** drag-to-reorder stage chips (arrow keys too), steppers, a live preview built from unsaved values ("would get reminders on 7 Jun, 13 Jun"), and change history from the audit trail.
 
 **Pages**
 

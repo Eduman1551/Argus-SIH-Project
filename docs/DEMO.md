@@ -4,8 +4,8 @@ Start the app with `pnpm dev` and open **http://localhost:3001** (the API answer
 http://localhost:8001/api/health; both ports can be changed with `WEB_PORT` / `API_PORT` in `.env`).
 
 Everything below uses the scripted cases in the synthetic dataset, so it works the same every time.
-Before you start, press the **Reset** button (↺ next to the clock) so the simulated date is
-**Fri, 15 May 2026**. Switch users with the person menu at the top right.
+Before you start, open the **date chip** in the navbar and press **Reset**, so the simulated date is
+**Fri, 15 May 2026**. Switch users from the **avatar menu** at the top right. **Ctrl+K** jumps to any page or case.
 
 > Shortcut: the **Guide and demo** page has **Run demo scenario**, which performs the same steps through
 > the engines and writes each caption from the real result.
@@ -14,17 +14,20 @@ Before you start, press the **Reset** button (↺ next to the clock) so the simu
 
 User: **Dr. Kavya Larkspur**, Ambervale Institute of Technology.
 
-- Home shows **Pending actions** sorted by due date: an undertaking due on **20 May (in 5 days)** and the
-  **land lease expiring on 4 June (in 20 days)**.
-- *My applications*: **ARG/2026/NR/0055** is in **Scrutiny**, on track.
-- Point out the red banner: synthetic data, prototype, illustrative rules.
+- Home shows **What needs you** sorted by due date: an undertaking due on **20 May (in 5 days)** and the
+  **land lease expiring on 4 June (in 20 days)**. The **Next 90 days** calendar shows the same deadlines,
+  with anything due within a week outlined in amber.
+- *My applications*: **ARG/2026/NR/0055** is in **Scrutiny**, on track. The bar shows time used in the stage;
+  click the row for a quick look in a side sheet.
+- Point out the footer line ("Prototype · all data is synthetic"); the Guide page states the rest:
+  illustrative rules, simulated delivery, humans decide.
 
 ## 2. Submit an application and watch it route (40 s)
 
 Still as Kavya: **New application** → type *New technical institution*. The form shows the route this type
 will follow (Completeness check → Scrutiny → EVC → SAC/SHC → Decision), taken from the Rules page.
 Submit. The case page opens at stage 1, already **assigned to an officer by workload**, with its due date.
-The timeline on the right shows each step written to the audit trail.
+The timeline at the bottom shows each step written to the audit trail, each with its hash.
 
 ## 3. Deficiency, reply, re-scrutiny (60 s)
 
@@ -34,7 +37,7 @@ The timeline on the right shows each step written to the audit trail.
    **AICTE time limit: Paused**.
 3. Switch to **Kavya** → open the case → **Reply to deficiency**, attach a PDF, send.
 4. Switch back to **Arjun** → **Complete scrutiny**. The case moves **by itself** to **Expert Visit (EVC)**
-   and appears in the EVC queue. The route bar shows how many days each stage took and how many were
+   and appears in the EVC queue. The route line at the top shows how many days each stage took and how many were
    waiting on the institution.
 
 ## 4. EVC board and a delayed visit (40 s)
@@ -47,12 +50,13 @@ The timeline on the right shows each step written to the audit trail.
 
 ## 5. Advance the clock: reminders, overdue, escalation (50 s)
 
-- Press **+7d** (now 22 May). The toast reports how many alerts and escalations fired. The bell count
-  rises. Ambervale's undertaking got its 1-day reminder on 19 May and its **overdue alert on 21 May**.
-- Press **+30d** (now 21 June). The lease got its 7-day reminder, then **expired**, then escalated; the
+- Open the date chip and press **+7 days** (now 22 May). The toast says what happened, for example
+  "7 days advanced: 12 reminders sent, 3 items overdue, 1 escalated to L2". The bell count rises. Ambervale's undertaking got its 1-day reminder on 19 May and its **overdue alert on 21 May**.
+- Press **+30 days** (now 21 June). The lease got its 7-day reminder, then **expired**, then escalated; the
   undertaking climbed **L1 → L2 → L3**.
-- Open **Escalations** (as Arjun or **Ritu Emberly**, Bureau Head): items grouped by level, each showing
-  who it went to (Regional Director, Bureau Officer, Bureau Head).
+- Open **Escalations** (as Arjun or **Ritu Emberly**, Bureau Head): one row per overdue item with the levels
+  it reached. Click a row: the **escalation ladder** shows who was alerted at each level and when the next
+  level is due.
 - **Notifications** → *Simulated email / SMS log*: every alert produced an in-app notification plus
   email and SMS rows with delivery status (queued, sent, delivered, failed). Nothing real is sent.
 
@@ -65,15 +69,16 @@ The timeline on the right shows each step written to the audit trail.
 
 ## 7. Audit trail (30 s)
 
-**Audit trail** → **Verify audit chain**: "Chain intact: all N entries verified". Click any entry to see
-its details, the previous hash and its own hash. Every action, alert, submission, verification,
+**Audit trail** → **Verify audit chain**: "Chain intact: all N entries verified". Click any entry: a side sheet shows
+its details and how its hash links to the previous entry. Every action, alert, submission, verification,
 escalation and closure from this demo is in the list. (The test suite shows that editing or deleting a
 past entry makes verification fail at that exact entry.)
 
 ## 8. Dashboards, reports and KPIs (40 s)
 
-- **Dashboard** (Arjun or Ritu): overdue, due soon, escalated, cases by stage with the bottleneck,
-  time waiting on AICTE vs institutions, Region-wise counts and ageing.
+- **Dashboard** (Arjun or Ritu): the **process line** shows how many cases sit at each step, with one dot per
+  case; click *Scrutiny* to list those cases. Click a **Region tile** to scope the whole page. Below: the
+  90-day deadline calendar, time waiting on AICTE vs institutions, ageing and the compliance watch list.
 - **Reports**: six reports with Region filter and **Download CSV**; totals match the dashboard.
 - **Performance**: all eight KPIs computed live, plus **Run self-test** (one application of each type
   routed through every stage inside a rolled-back transaction).
@@ -85,8 +90,9 @@ past entry makes verification fail at that exact entry.)
   An Assistant Director or a committee member cannot record a decision.
 - **Dr. Sana Thistledown** (SAC/SHC) → *My cases* → **ARG/2026/WR/0022**: electronic case summary built
   from case facts (Redraft uses Groq if configured, otherwise the offline template) → **Record recommendation**.
-- **Ritu Emberly** (Bureau Head) → **Rules and timelines**: change a reminder day or a time limit. It
-  applies at once and appears in the audit trail as `rule.changed`.
+- **Ritu Emberly** (Bureau Head) → **Rules and timelines**: drag a stage chip to reorder a route, or change a
+  reminder day with the stepper and watch the preview dates move before saving. It applies at once and
+  appears under *Change history* and in the audit trail as `rule.changed`.
 
 Other scripted cases: **ARG/2026/SR/0039** returned and waiting on the institution (reply overdue, L1),
 **ARG/2026/WR/0043** scrutiny overdue, **ARG/2026/CR/0036** already at **L2**, Rivenmoor College's lease

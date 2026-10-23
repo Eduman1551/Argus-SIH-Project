@@ -124,9 +124,12 @@ Names are invented: imaginary towns, and person surnames that are unusual nature
 
 ## UI notes
 
-- Theme tokens from the brief (`--paper`, `--red`, …). Small status text uses darker variants of the ochre
-  (`#8A5A12`) and olive (`#4A6830`) so it keeps WCAG AA contrast on paper (the brief's `#B7791F` and
-  `#5B7B3A` are used for fills, icons and borders). Red `#B3262D` on paper is 5.4:1.
+- Theme "stone and pine": tokens in `frontend/app/globals.css` (see CLAUDE.md section 9). Small text on
+  tinted fills uses the `-ink` variants (amber-ink `#8A5A12` on amber-tint is 5.2:1, red-ink on red-tint 5.5:1);
+  the region tiles and chart ramp were checked so text on every step passes AA.
+- Geist Sans and Geist Mono are bundled by the `geist` package, so the UI works offline.
+- Tables support keyboard row navigation (arrow keys, Enter) and a side-sheet quick look; motion is
+  transform/opacity only and switches off under `prefers-reduced-motion`.
 - Polling `/api/live` every 3 s (6 s when the tab is hidden). The response carries the latest audit id;
   when it changes, every visible view refetches quietly.
 - A request taking longer than 2.5 s shows "Waking up the server"; an unreachable API shows a Retry banner.

@@ -43,7 +43,7 @@ flowchart TD
     N --> I["Institution submits evidence"] --> O["Official verifies"] --> C["Closed, or escalated further"]
 ```
 
-All deadlines read time from one **simulated platform clock** (`+1d / +7d / +30d` in the top bar). The
+All deadlines read time from one **simulated platform clock** (the date chip in the navbar: +1 day, +7 days, +30 days, Reset). The
 clock moves one day at a time and runs the alert tick each day, so reminders fire on exactly their day.
 Details: [docs/DETAILS.md](docs/DETAILS.md).
 
@@ -98,6 +98,20 @@ PostgreSQL `bin` folder on PATH); use `DATABASE_URL=postgresql://argus@localhost
 A 4 to 5 minute script is in [docs/DEMO.md](docs/DEMO.md). The **Guide and demo** page in the app can also
 run the scenario step by step, with captions written from what actually happened.
 
+## Screenshots
+
+Synthetic data throughout. More, for every page and role at 1366x768 and 1920x1080, come from
+`node scripts/screens-all.mjs <folder>` (written to `screenshots/<folder>/`, not committed).
+
+| | |
+|---|---|
+| ![Official dashboard with the process line, region tiles and deadline calendar](docs/screenshots/official-dashboard.png) | ![Case page with route line, SLA bar and escalation ladder](docs/screenshots/case-page.png) |
+| **Official dashboard**: process line, Region tiles, 90-day deadline calendar | **Case page**: route line, SLA bar, escalation ladder, contents list |
+| ![Institution home](docs/screenshots/institution-home.png) | ![Escalations with ladder side sheet](docs/screenshots/escalations.png) |
+| **Institution home**: what needs you, deadline calendar, applications with SLA bars | **Escalations**: levels reached, countdown to the next level, ladder in a side sheet |
+| ![EVC scheduling board](docs/screenshots/evc-board.png) | ![Rules page](docs/screenshots/rules.png) |
+| **EVC board**: queue to delayed, member avatars | **Rules**: stage chips, steppers, live date preview |
+
 ## Measured results
 
 From `pnpm smoke` on the synthetic dataset (guided scenario, then 37 simulated days). Targets are our own
@@ -120,7 +134,7 @@ its stages inside a rolled-back transaction: 7 of 7 routed correctly.
 ## Tech stack
 
 FastAPI + Pydantic v2 · PostgreSQL via psycopg 3 and plain SQL (no ORM) · Next.js 16 (App Router), React 19,
-TypeScript, Tailwind CSS 4, Zustand, Recharts, lucide-react · Source Serif 4 and Inter bundled locally ·
+TypeScript, Tailwind CSS 4, Zustand, Recharts, lucide-react, motion · Geist Sans and Geist Mono bundled locally ·
 Groq (optional, free tier) for drafting, with offline templates · pytest, ruff, Playwright · pnpm.
 Deploys as one Vercel project (Next.js and FastAPI as two services, see `vercel.json`) with Neon Postgres.
 
