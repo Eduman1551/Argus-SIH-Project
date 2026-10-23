@@ -64,36 +64,46 @@ def fmt_date(value) -> str:
 
 
 # ------------------------------------------------------------------ people
+# Users do not change while the app runs (there is no user management in v1), so one query per
+# transaction loads them all and the helpers below read from that cache.
+def users_by_id(conn: Conn) -> dict[int, dict]:
+    if "users" not in conn.cache:
+        conn.cache["users"] = {u["id"]: u for u in conn.all("SELECT * FROM users ORDER BY id")}
+    return conn.cache["users"]
+
+
 def get_user(conn: Conn, user_id: int) -> dict:
-    row = conn.one("SELECT * FROM users WHERE id = %s", (user_id,))
+    row = users_by_id(conn).get(user_id)
     if row is None:
         raise NotFound("User not found.")
     return row
 
 
+def _officials(conn: Conn, kind: str, rank: int, region_id: int | None = None) -> list[dict]:
+    return [u for u in users_by_id(conn).values()
+            if u["role"] == "official" and u["official_kind"] == kind and u["rank"] == rank
+            and (region_id is None or u["region_id"] == region_id)]
+
+
 def institution_users(conn: Conn, institution_id: int) -> list[int]:
-    return [r["id"] for r in conn.all(
-        "SELECT id FROM users WHERE role = 'institution' AND institution_id = %s ORDER BY id", (institution_id,))]
+    return [u["id"] for u in users_by_id(conn).values()
+            if u["role"] == "institution" and u["institution_id"] == institution_id]
 
 
 def region_officers(conn: Conn, region_id: int) -> list[dict]:
-    return conn.all("""SELECT * FROM users WHERE role = 'official' AND official_kind = 'regional'
-                       AND rank = 1 AND region_id = %s ORDER BY id""", (region_id,))
+    return _officials(conn, "regional", 1, region_id)
 
 
 def region_director(conn: Conn, region_id: int) -> dict | None:
-    return conn.one("""SELECT * FROM users WHERE role = 'official' AND official_kind = 'regional'
-                       AND rank = 2 AND region_id = %s ORDER BY id LIMIT 1""", (region_id,))
+    return next(iter(_officials(conn, "regional", 2, region_id)), None)
 
 
 def bureau_officer(conn: Conn) -> dict | None:
-    return conn.one("""SELECT * FROM users WHERE role = 'official' AND official_kind = 'bureau'
-                       AND rank = 2 ORDER BY id LIMIT 1""")
+    return next(iter(_officials(conn, "bureau", 2)), None)
 
 
 def bureau_head(conn: Conn) -> dict | None:
-    return conn.one("""SELECT * FROM users WHERE role = 'official' AND official_kind = 'bureau'
-                       AND rank = 3 ORDER BY id LIMIT 1""")
+    return next(iter(_officials(conn, "bureau", 3)), None)
 
 
 def is_bureau(user: dict) -> bool:

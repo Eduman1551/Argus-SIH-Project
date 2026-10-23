@@ -49,7 +49,7 @@ def init_clock(conn: Conn, at: datetime) -> None:
 
 
 def set_now(conn: Conn, at: datetime) -> None:
-    conn.run("UPDATE platform_clock SET sim_now = %s WHERE id = 1", (at,))
+    conn.defer("UPDATE platform_clock SET sim_now = %s WHERE id = 1", (at,))
 
 
 def state(conn: Conn) -> dict:
@@ -83,7 +83,8 @@ def advance(conn: Conn, days: int, actor: dict | None) -> dict:
     for i in range(1, days + 1):
         current = start + timedelta(days=i)
         set_now(conn, current)
-        result = run_alert_tick(conn, current)
+        # time passing alone never closes an item, so escalation clean-up already ran in the first tick
+        result = run_alert_tick(conn, current, resolve=False)
         for k in totals:
             totals[k] += result.get(k, 0)
     end = now(conn)

@@ -264,10 +264,20 @@ def board(conn: Conn, now: datetime, visit_ids: list[int] | None = None) -> list
            ORDER BY v.step_due_at NULLS LAST, v.id""",
         (visit_ids, visit_ids),
     )
+    all_members: dict[int, list[dict]] = {}
+    if rows:
+        for m in conn.all(
+            """SELECT m.visit_id, m.user_id, m.is_convenor, m.availability, m.available_dates, m.responded_at,
+                      u.name, u.designation
+               FROM evc_members m JOIN users u ON u.id = m.user_id WHERE m.visit_id = ANY(%s)
+               ORDER BY m.visit_id, m.is_convenor DESC, u.name""",
+            ([v["id"] for v in rows],),
+        ):
+            all_members.setdefault(m.pop("visit_id"), []).append(m)
     for v in rows:
         v["category"] = board_category(v, today, window)
         step = STEP_OF_STATUS.get(v["status"])
         v["step"] = step[1] if step else "Completed"
         v["days_to_due"] = (ist_date(v["step_due_at"]) - today).days if v["step_due_at"] else None
-        v["members"] = members(conn, v["id"])
+        v["members"] = all_members.get(v["id"], [])
     return rows

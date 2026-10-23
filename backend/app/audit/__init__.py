@@ -60,10 +60,15 @@ def record(
     application_id: int | None = None,
     details: dict | None = None,
 ) -> int:
-    conn.run("SELECT pg_advisory_xact_lock(%s)", (_CHAIN_LOCK,))
-    prev = conn.val("SELECT hash FROM audit_log ORDER BY id DESC LIMIT 1") or GENESIS
+    if conn.audit_head is None:
+        # First entry in this transaction: take the chain lock (held until commit), then read the
+        # head. Later entries in the same transaction continue from the head kept in memory.
+        conn.run("SELECT pg_advisory_xact_lock(%s)", (_CHAIN_LOCK,))
+        head = conn.one("SELECT id, hash FROM audit_log ORDER BY id DESC LIMIT 1")
+        conn.audit_head = (head["id"], head["hash"]) if head else (0, GENESIS)
+    last_id, prev = conn.audit_head
     entry = {
-        "id": conn.val("SELECT nextval('audit_log_id_seq')"),
+        "id": last_id + 1,
         "at": at,
         "actor_id": actor["id"] if actor else None,
         "actor_label": actor_label(actor),
@@ -75,7 +80,8 @@ def record(
     }
     entry["prev_hash"] = prev
     entry["hash"] = compute_hash(prev, entry)
-    conn.run(
+    conn.audit_head = (entry["id"], entry["hash"])
+    conn.defer(
         """INSERT INTO audit_log (id, at, actor_id, actor_label, action, entity_type, entity_id,
                                   application_id, details, prev_hash, hash)
            VALUES (%(id)s, %(at)s, %(actor_id)s, %(actor_label)s, %(action)s, %(entity_type)s, %(entity_id)s,
@@ -89,6 +95,7 @@ def verify_chain(conn: Conn) -> dict:
     """Recompute every hash in order. Returns where the chain first breaks, if it does."""
     prev = GENESIS
     checked = 0
+    conn.flush()
     with conn.raw.cursor(name="audit_verify") as cur:
         cur.itersize = 2000
         cur.execute(

@@ -76,18 +76,22 @@ def route_stage_codes(conn: Conn, route_code: str) -> list[str]:
         "SELECT stage_code FROM route_stages WHERE route_code = %s ORDER BY seq", (route_code,))]
 
 
+# Settings and templates are read once per transaction; an update in the same transaction clears them.
 def setting(conn: Conn, key: str) -> Any:
-    row = conn.one("SELECT value FROM settings WHERE key = %s", (key,))
-    if row is None:
+    if "settings" not in conn.cache:
+        conn.cache["settings"] = {r["key"]: r["value"] for r in conn.all("SELECT key, value FROM settings")}
+    if key not in conn.cache["settings"]:
         raise RuleError(f"Unknown setting {key}")
-    return row["value"]
+    return conn.cache["settings"][key]
 
 
 def template(conn: Conn, code: str) -> dict:
-    row = conn.one("SELECT code, subject, body, sms FROM notification_templates WHERE code = %s", (code,))
-    if row is None:
+    if "templates" not in conn.cache:
+        conn.cache["templates"] = {r["code"]: r for r in conn.all(
+            "SELECT code, subject, body, sms FROM notification_templates")}
+    if code not in conn.cache["templates"]:
         raise RuleError(f"Unknown template {code}")
-    return row
+    return conn.cache["templates"][code]
 
 
 def get_all(conn: Conn) -> dict:
@@ -114,6 +118,8 @@ def get_all(conn: Conn) -> dict:
 
 # ------------------------------------------------------------------ updates (all audited)
 def _audit(conn: Conn, now, actor, what: str, key: str, before: Any, after: Any) -> None:
+    conn.cache.pop("settings", None)
+    conn.cache.pop("templates", None)
     record(conn, at=now, actor=actor, action="rule.changed", entity_type="rule", entity_id=f"{what}:{key}",
            details={"rule": what, "key": key, "before": before, "after": after})
 

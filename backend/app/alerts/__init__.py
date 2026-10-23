@@ -28,6 +28,7 @@ from app.common import (
     institution_users,
     region_director,
     region_officers,
+    users_by_id,
 )
 from db import Conn
 
@@ -47,20 +48,23 @@ TRACKED_ITEMS_SQL = f"""
 SELECT 'stage'::text AS entity_type, s.id AS entity_id, 'stage'::text AS cycle,
        ist_date(s.due_at) AS due_date, ist_date(s.started_at) AS start_date, (s.paused_at IS NOT NULL) AS paused,
        a.id AS application_id, a.institution_id, a.region_id, a.ref_no, i.name AS institution,
-       st.name AS item, s.stage_code AS detail, s.id AS stage_id
+       st.name AS item, s.stage_code AS detail, s.id AS stage_id, s.assigned_to AS owner_id
 FROM application_stages s JOIN applications a ON a.id = s.application_id
 JOIN institutions i ON i.id = a.institution_id JOIN stages st ON st.code = s.stage_code
 WHERE s.status = 'active' AND s.stage_code <> 'evc'
 UNION ALL
 SELECT 'deficiency', d.id, 'reply', ist_date(d.response_due_at), ist_date(d.raised_at), false,
-       a.id, a.institution_id, a.region_id, a.ref_no, i.name, 'Reply to deficiency on ' || a.ref_no, NULL, d.stage_id
+       a.id, a.institution_id, a.region_id, a.ref_no, i.name, 'Reply to deficiency on ' || a.ref_no, NULL, d.stage_id,
+       ds.assigned_to
 FROM deficiencies d JOIN applications a ON a.id = d.application_id JOIN institutions i ON i.id = a.institution_id
+JOIN application_stages ds ON ds.id = d.stage_id
 WHERE d.status = 'open'
 UNION ALL
 SELECT 'evc_step', v.id, v.status || ':' || ist_date(v.step_due_at)::text, ist_date(v.step_due_at),
        ist_date(v.step_started_at), false, a.id, a.institution_id, a.region_id, a.ref_no, i.name,
-       {EVC_STEP_LABEL}, v.status, v.stage_id
+       {EVC_STEP_LABEL}, v.status, v.stage_id, vs.assigned_to
 FROM evc_visits v JOIN applications a ON a.id = v.application_id JOIN institutions i ON i.id = a.institution_id
+JOIN application_stages vs ON vs.id = v.stage_id
 WHERE v.status IN ('assignment_pending', 'availability_pending', 'date_pending', 'scheduled', 'report_pending',
                    'report_submitted') AND v.step_due_at IS NOT NULL
 UNION ALL
@@ -68,13 +72,13 @@ SELECT 'undertaking', u.id, 'u', ist_date(u.due_at),
        ist_date(GREATEST(u.created_at, (SELECT max(e.reviewed_at) FROM evidence_submissions e
                                          WHERE e.undertaking_id = u.id))), false,
        u.application_id, u.institution_id, i.region_id, a.ref_no, i.name,
-       'Undertaking: ' || left(u.condition_text, 90), NULL, NULL
+       'Undertaking: ' || left(u.condition_text, 90), NULL, NULL, NULL
 FROM undertakings u JOIN institutions i ON i.id = u.institution_id JOIN applications a ON a.id = u.application_id
 WHERE u.status IN ('open', 'resubmission_requested')
 UNION ALL
 SELECT 'document', t.id, t.expires_on::text, t.expires_on,
        ist_date(GREATEST(t.tracked_since, t.verified_at, t.rejected_at)), false,
-       NULL, t.institution_id, i.region_id, NULL, i.name, t.title, t.doc_type, NULL
+       NULL, t.institution_id, i.region_id, NULL, i.name, t.title, t.doc_type, NULL, NULL
 FROM tracked_documents t JOIN institutions i ON i.id = t.institution_id
 WHERE t.status IN ('valid', 'renewal_rejected')
 """
@@ -82,8 +86,7 @@ WHERE t.status IN ('valid', 'renewal_rejected')
 _KEY = "i.entity_type || ':' || i.entity_id || ':' || i.cycle || ':'"
 
 REMINDER_CANDIDATES_SQL = f"""
-WITH items AS ({TRACKED_ITEMS_SQL})
-SELECT i.*, r.id AS rule_id, r.kind, r.offset_days, r.template_code, NULL::int AS level,
+SELECT 0 AS grp, i.*, r.id AS rule_id, r.kind, r.offset_days, r.template_code, NULL::int AS level,
        NULL::text AS level_title, NULL::text AS target,
        GREATEST(i.due_date + r.offset_days, i.start_date, r.effective_from) AS trigger_date,
        {_KEY} || r.kind || ':' || r.offset_days AS alert_key
@@ -96,12 +99,10 @@ WHERE NOT i.paused
         AND %(today)s >= GREATEST(i.start_date, r.effective_from))
     OR (r.kind = 'overdue' AND i.due_date + r.offset_days <= %(today)s))
   AND NOT EXISTS (SELECT 1 FROM alerts x WHERE x.alert_key = {_KEY} || r.kind || ':' || r.offset_days)
-ORDER BY i.entity_type, i.entity_id, r.offset_days
 """
 
 ESCALATION_CANDIDATES_SQL = f"""
-WITH items AS ({TRACKED_ITEMS_SQL})
-SELECT i.*, e.id AS rule_id, 'escalation'::text AS kind, e.days_after_due AS offset_days,
+SELECT 1 AS grp, i.*, e.id AS rule_id, 'escalation'::text AS kind, e.days_after_due AS offset_days,
        'escalation'::text AS template_code, e.level, l.title AS level_title, l.target,
        GREATEST(i.due_date + e.days_after_due, i.start_date, e.effective_from) AS trigger_date,
        {_KEY} || 'escalation:L' || e.level AS alert_key
@@ -110,7 +111,13 @@ JOIN escalation_levels l ON l.level = e.level
 WHERE NOT i.paused
   AND i.due_date + e.days_after_due <= %(today)s
   AND NOT EXISTS (SELECT 1 FROM alerts x WHERE x.alert_key = {_KEY} || 'escalation:L' || e.level)
-ORDER BY i.entity_type, i.entity_id, e.level
+"""
+
+# Reminders and overdue alerts first, then escalations; one round trip for both.
+CANDIDATES_SQL = f"""
+WITH items AS ({TRACKED_ITEMS_SQL})
+SELECT * FROM ({REMINDER_CANDIDATES_SQL} UNION ALL {ESCALATION_CANDIDATES_SQL}) c
+ORDER BY grp, entity_type, entity_id, COALESCE(level, offset_days)
 """
 
 RESOLVE_SQL = f"""
@@ -124,36 +131,50 @@ RETURNING e.id, e.entity_type, e.entity_id, e.cycle, e.level
 
 
 # ------------------------------------------------------------------ recipients
-def _owners(conn: Conn, it: dict, kind: str) -> list[int]:
+def _members(conn: Conn, items: list[dict]) -> dict:
+    """Committee members for the SAC stages and EVC visits among today's candidates (one query)."""
+    stage_ids = [i["stage_id"] for i in items if i["entity_type"] == "stage" and i["detail"] == "sac"]
+    visit_ids = [i["entity_id"] for i in items if i["entity_type"] == "evc_step"]
+    out: dict = {"sac": defaultdict(list), "evc": defaultdict(list), "evc_pending": defaultdict(list)}
+    if not stage_ids and not visit_ids:
+        return out
+    for r in conn.all(
+        """SELECT 'sac' AS kind, r.stage_id AS key, m.user_id, false AS convenor, 'n/a' AS availability
+           FROM committee_members m JOIN committee_reviews r ON r.id = m.review_id WHERE r.stage_id = ANY(%(s)s)
+           UNION ALL
+           SELECT 'evc', visit_id, user_id, is_convenor, availability FROM evc_members WHERE visit_id = ANY(%(v)s)
+           ORDER BY kind, key, convenor DESC, user_id""",
+        {"s": stage_ids, "v": visit_ids},
+    ):
+        out[r["kind"]][r["key"]].append(r["user_id"])
+        if r["kind"] == "evc" and r["availability"] == "pending":
+            out["evc_pending"][r["key"]].append(r["user_id"])
+    for v in out["evc_pending"].values():
+        v.sort()
+    return out
+
+
+def _owners(conn: Conn, it: dict, kind: str, members: dict) -> list[int]:
     """Who is responsible for acting on the item (receives reminders and overdue alerts)."""
     et = it["entity_type"]
     if et == "stage":
         if it["detail"] == "sac":
-            return [r["user_id"] for r in conn.all(
-                """SELECT m.user_id FROM committee_members m JOIN committee_reviews r ON r.id = m.review_id
-                   WHERE r.stage_id = %s ORDER BY m.user_id""", (it["stage_id"],))]
-        owner = conn.val("SELECT assigned_to FROM application_stages WHERE id = %s", (it["stage_id"],))
-        if owner:
-            return [owner]
+            return sorted(members["sac"][it["stage_id"]])
+        if it["owner_id"]:
+            return [it["owner_id"]]
         rd = region_director(conn, it["region_id"])
         return [rd["id"]] if rd else []
     if et == "evc_step":
         status = it["detail"]
         if status == "availability_pending":
-            return [r["user_id"] for r in conn.all(
-                "SELECT user_id FROM evc_members WHERE visit_id = %s AND availability = 'pending' ORDER BY user_id",
-                (it["entity_id"],))]
+            return list(members["evc_pending"][it["entity_id"]])
         if status in ("scheduled", "report_pending"):
-            return [r["user_id"] for r in conn.all(
-                "SELECT user_id FROM evc_members WHERE visit_id = %s ORDER BY is_convenor DESC, user_id",
-                (it["entity_id"],))]
-        owner = conn.val("SELECT assigned_to FROM application_stages WHERE id = %s", (it["stage_id"],))
-        return [owner] if owner else []
+            return list(members["evc"][it["entity_id"]])
+        return [it["owner_id"]] if it["owner_id"] else []
     users = institution_users(conn, it["institution_id"])
     if kind == "overdue":
         if et == "deficiency":
-            owner = conn.val("SELECT assigned_to FROM application_stages WHERE id = %s", (it["stage_id"],))
-            users += [owner] if owner else []
+            users += [it["owner_id"]] if it["owner_id"] else []
         else:
             users += [o["id"] for o in region_officers(conn, it["region_id"])]
     return users
@@ -167,11 +188,9 @@ def _escalation_target(conn: Conn, it: dict, target: str) -> dict | None:
     if target == "bureau_head":
         return bureau_head(conn)
     # assigned_officer
-    if it["stage_id"]:
-        uid = conn.val("SELECT assigned_to FROM application_stages WHERE id = %s", (it["stage_id"],))
-        u = conn.one("SELECT * FROM users WHERE id = %s AND role = 'official'", (uid,)) if uid else None
-        if u:
-            return u
+    owner = users_by_id(conn).get(it["owner_id"]) if it["owner_id"] else None
+    if owner and owner["role"] == "official":
+        return owner
     officers = region_officers(conn, it["region_id"])
     return officers[0] if officers else region_director(conn, it["region_id"])
 
@@ -196,7 +215,9 @@ def _days_text(n: int) -> str:
 
 
 # ------------------------------------------------------------------ tick
-def _fire(conn: Conn, now: datetime, today: date, it: dict) -> dict | None:
+def _fire(conn: Conn, now: datetime, today: date, it: dict, alert_id: int, members: dict) -> dict:
+    """Write one alert with its notifications, outbox rows, escalation row and audit entry.
+    Everything here is queued and sent in one round trip; the id was reserved under the tick lock."""
     kind = it["kind"]
     days_to_due = (it["due_date"] - today).days
     ctx = {
@@ -206,26 +227,23 @@ def _fire(conn: Conn, now: datetime, today: date, it: dict) -> dict | None:
         "level_title": it["level_title"] or "", "ref_or_institution": it["ref_no"] or it["institution"],
     }
     msg = notifications.render(conn, it["template_code"], ctx)
-    alert_id = conn.val(
-        """INSERT INTO alerts (alert_key, entity_type, entity_id, cycle, kind, rule_id, offset_days, level, due_date,
+    conn.defer(
+        """INSERT INTO alerts (id, alert_key, entity_type, entity_id, cycle, kind, rule_id, offset_days, level, due_date,
                                trigger_date, fired_at, application_id, institution_id, region_id, title, message)
-           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-           ON CONFLICT (alert_key) DO NOTHING RETURNING id""",
-        (it["alert_key"], it["entity_type"], it["entity_id"], it["cycle"], kind, it["rule_id"], it["offset_days"],
-         it["level"], it["due_date"], it["trigger_date"], now, it["application_id"], it["institution_id"],
-         it["region_id"], msg["subject"], msg["body"]),
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+        (alert_id, it["alert_key"], it["entity_type"], it["entity_id"], it["cycle"], kind, it["rule_id"],
+         it["offset_days"], it["level"], it["due_date"], it["trigger_date"], now, it["application_id"],
+         it["institution_id"], it["region_id"], msg["subject"], msg["body"]),
     )
-    if alert_id is None:  # another tick already fired it
-        return None
 
-    owners = _owners(conn, it, "overdue" if kind == "escalation" else kind)
+    owners = _owners(conn, it, "overdue" if kind == "escalation" else kind, members)
     target = None
     recipients = list(owners)
     if kind == "escalation":
         target = _escalation_target(conn, it, it["target"])
         if target:
             recipients = [target["id"]] + recipients
-        conn.run(
+        conn.defer(
             """INSERT INTO escalations (alert_id, entity_type, entity_id, cycle, level, due_date, escalated_at,
                                         target_user_id, status)
                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'open') ON CONFLICT DO NOTHING""",
@@ -233,14 +251,18 @@ def _fire(conn: Conn, now: datetime, today: date, it: dict) -> dict | None:
              target["id"] if target else None),
         )
 
-    by_role: dict[str, list[int]] = defaultdict(list)
-    for r in conn.all("SELECT id, role FROM users WHERE id = ANY(%s)", (recipients,)):
-        by_role[r["role"]].append(r["id"])
+    # One notify call per role (each role gets its own link); roles in order of their lowest user id.
+    users = users_by_id(conn)
+    by_role: dict[str, list[int]] = {}
+    for uid in sorted(u for u in set(recipients) if u in users):
+        by_role.setdefault(users[uid]["role"], [])
+    for uid in recipients:
+        if uid in users:
+            by_role[users[uid]["role"]].append(uid)
     notified = 0
     for role, ids in by_role.items():
-        ordered = [u for u in recipients if u in ids]
-        notified += len(notifications.notify(conn, now=now, user_ids=ordered, template_code=it["template_code"],
-                                             ctx=ctx, link=_link(role, it), kind=kind, alert_id=alert_id, sms=True))
+        notified += notifications.notify(conn, now=now, user_ids=ids, template_code=it["template_code"],
+                                         ctx=ctx, link=_link(role, it), kind=kind, alert_id=alert_id, sms=True)
     record(
         conn, at=now, actor=None,
         action="escalation.raised" if kind == "escalation" else "alert.fired",
@@ -250,48 +272,59 @@ def _fire(conn: Conn, now: datetime, today: date, it: dict) -> dict | None:
                  "trigger_date": it["trigger_date"].isoformat(), "recipients": len(set(recipients)),
                  "escalated_to": target["name"] if target else None},
     )
-    return {"alert_id": alert_id, "notified": notified, "escalation": kind == "escalation"}
+    return {"notified": notified, "escalation": kind == "escalation"}
 
 
-def run_alert_tick(conn: Conn, now: datetime) -> dict:
-    """Evaluate every open item against the rules at simulated time `now`. Safe to call any number of times."""
+def run_alert_tick(conn: Conn, now: datetime, resolve: bool = True) -> dict:
+    """Evaluate every open item against the rules at simulated time `now`. Safe to call any number of times.
+
+    `resolve=False` skips the escalation clean-up; the clock advance uses it for the days after the
+    first, because time passing alone never closes an item."""
     conn.run("SELECT pg_advisory_xact_lock(%s)", (TICK_LOCK,))
     today = ist_date(now)
     delivery = notifications.progress_outbox(conn, now)
 
     fired = {"alerts": 0, "escalations": 0, "notifications": 0, "resolved": 0}
-    for sql in (REMINDER_CANDIDATES_SQL, ESCALATION_CANDIDATES_SQL):
-        for it in conn.all(sql, {"today": today}):
-            res = _fire(conn, now, today, it)
-            if res:
-                fired["alerts"] += 1
-                fired["escalations"] += int(res["escalation"])
-                fired["notifications"] += res["notified"]
+    candidates = conn.all(CANDIDATES_SQL, {"today": today})
+    if candidates:
+        # Under the tick lock nobody else inserts alerts, so ids can be handed out here and the
+        # candidate query has already excluded every key that exists: no duplicates are possible,
+        # and the unique alert_key constraint would reject one anyway.
+        next_id = conn.val("SELECT COALESCE(max(id), 0) FROM alerts") + 1
+        members = _members(conn, candidates)
+        for offset, it in enumerate(candidates):
+            res = _fire(conn, now, today, it, next_id + offset, members)
+            fired["alerts"] += 1
+            fired["escalations"] += int(res["escalation"])
+            fired["notifications"] += res["notified"]
+        conn.defer("SELECT setval(pg_get_serial_sequence('alerts', 'id'), %s)", (next_id + len(candidates) - 1,))
 
-    for row in conn.all(RESOLVE_SQL, {"now": now}):
-        fired["resolved"] += 1
-        record(conn, at=now, actor=None, action="escalation.resolved", entity_type="escalation", entity_id=row["id"],
-               details={"item": f"{row['entity_type']}:{row['entity_id']}", "level": row["level"]})
+    if resolve:
+        for row in conn.all(RESOLVE_SQL, {"now": now}):
+            fired["resolved"] += 1
+            record(conn, at=now, actor=None, action="escalation.resolved", entity_type="escalation",
+                   entity_id=row["id"], details={"item": f"{row['entity_type']}:{row['entity_id']}",
+                                                 "level": row["level"]})
 
     if any(delivery.values()):
         record(conn, at=now, actor=None, action="outbox.delivery_updated", entity_type="outbox", entity_id="batch",
                details={**delivery, "simulated": True})
-    conn.run("UPDATE platform_clock SET last_tick_sim = %s, last_tick_wall = clock_timestamp() WHERE id = 1", (now,))
+    conn.defer("UPDATE platform_clock SET last_tick_sim = %s, last_tick_wall = clock_timestamp() WHERE id = 1", (now,))
     return {**fired, "delivery": delivery, "today": today.isoformat()}
 
 
 def maybe_tick(conn: Conn) -> dict | None:
     """Cheap guard used by /api/live: run the tick only if the clock moved since the last tick or the
-    last tick is older than a few seconds of real time, and only if no other tick is running."""
-    if not conn.val("SELECT pg_try_advisory_xact_lock(%s)", (TICK_LOCK,)):
-        return None
+    last tick is older than a few seconds of real time, and only if no other tick is running.
+    One round trip when nothing is due."""
     row = conn.one(
-        """SELECT sim_now, (last_tick_sim IS NULL OR last_tick_sim <> sim_now
-                  OR last_tick_wall < clock_timestamp() - make_interval(secs => %s)) AS due
+        """SELECT pg_try_advisory_xact_lock(%s) AS got, sim_now,
+                  (last_tick_sim IS NULL OR last_tick_sim <> sim_now
+                   OR last_tick_wall < clock_timestamp() - make_interval(secs => %s)) AS due
            FROM platform_clock WHERE id = 1""",
-        (LIVE_TICK_SECONDS,),
+        (TICK_LOCK, LIVE_TICK_SECONDS),
     )
-    if row is None or not row["due"]:
+    if row is None or not row["got"] or not row["due"]:
         return None
     from app.clock import IST
 

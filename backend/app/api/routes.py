@@ -26,6 +26,7 @@ from app.auth import (
     require_bureau,
     require_role,
     sign,
+    unsign,
 )
 from app.common import Invalid, NotAllowed, NotFound, ensure
 from app.config import get_settings
@@ -101,18 +102,15 @@ def end_session(response: Response):
 @router.get("/live")
 def live(request: Request):
     """Polled every few seconds. Runs the alert tick when due (guarded) and returns what changed."""
+    uid = unsign(request.cookies.get(COOKIE))
     with transaction() as c:
         tick = maybe_tick(c)
-    with transaction() as c:
-        out = {"clock": clock.state(c), "version": c.val("SELECT COALESCE(max(id), 0) FROM audit_log"),
-               "ticked": bool(tick and (tick["alerts"] or tick["resolved"] or any(tick["delivery"].values()))),
-               "unread": 0}
-        try:
-            user = load_user(c, request.cookies.get(COOKIE))
-            out["unread"] = notifications.unread_count(c, user["id"])
-        except NotSignedIn:
-            pass
-    return out
+        row = c.one(
+            """SELECT (SELECT COALESCE(max(id), 0) FROM audit_log) AS version,
+                      (SELECT count(*) FROM notifications WHERE user_id = %s AND read_at IS NULL) AS unread""",
+            (uid,))
+        return {"clock": clock.state(c), "version": row["version"], "unread": row["unread"] if uid else 0,
+                "ticked": bool(tick and (tick["alerts"] or tick["resolved"] or any(tick["delivery"].values())))}
 
 
 @router.get("/clock")

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import psycopg
+from psycopg import ClientCursor
 from psycopg.rows import dict_row
 
 from app.config import get_settings
@@ -64,10 +65,10 @@ def transaction() -> Iterator[Conn]:
     conn = Conn(raw)
     try:
         yield conn
-        raw.commit()
+        conn.commit()
     except BaseException:
         if not raw.closed:
-            raw.rollback()
+            conn.rollback()
         raise
     finally:
         _checkin(raw)
@@ -79,17 +80,39 @@ def connect() -> psycopg.Connection:
 
 
 class Conn:
-    """Thin wrapper with the few helpers the services need."""
+    """Thin wrapper with the few helpers the services need.
+
+    Round trips matter when the database is far away (a remote Neon database can be ~90 ms per
+    query). Writes whose result is not needed can be queued with `defer`; they are sent together,
+    in order, in one round trip just before the next read or at commit, so they always stay in the
+    same transaction and order as the code that issued them. `cache` holds per-transaction lookups
+    (users, templates, settings) that do not change during a request.
+    """
 
     def __init__(self, raw: psycopg.Connection):
         self.raw = raw
+        self.cache: dict[str, Any] = {}
+        self.audit_head: tuple[int, str] | None = None  # (last id, last hash) while the chain lock is held
+        self._pending: list[str] = []
+
+    def defer(self, sql: str, params: Any = None) -> None:
+        """Queue a write whose result is not needed. Sent with the next read or at commit."""
+        with ClientCursor(self.raw) as cur:
+            self._pending.append(cur.mogrify(sql, params))
+
+    def flush(self) -> None:
+        if self._pending:
+            batch, self._pending = ";\n".join(self._pending), []
+            self.raw.execute(batch)  # type: ignore[arg-type]  # no parameters: one round trip
 
     def all(self, sql: str, params: Any = None) -> list[dict]:
+        self.flush()
         with self.raw.cursor() as cur:
             cur.execute(sql, params)
             return list(cur.fetchall()) if cur.description else []
 
     def one(self, sql: str, params: Any = None) -> dict | None:
+        self.flush()
         with self.raw.cursor() as cur:
             cur.execute(sql, params)
             return cur.fetchone() if cur.description else None
@@ -99,25 +122,42 @@ class Conn:
         return None if row is None else next(iter(row.values()))
 
     def run(self, sql: str, params: Any = None) -> int:
+        self.flush()
         with self.raw.cursor() as cur:
             cur.execute(sql, params)
             return cur.rowcount
 
     def many(self, sql: str, rows: list) -> None:
         if rows:
+            self.flush()
             with self.raw.cursor() as cur:
                 cur.executemany(sql, rows)
 
     def script(self, sql: str) -> None:
         """Run several statements (no parameters)."""
+        self.flush()
         self.raw.execute(sql)  # type: ignore[arg-type]
 
+    def forget(self) -> None:
+        """Drop per-transaction state (after a rollback or a rollback to a savepoint)."""
+        self._pending = []
+        self.cache = {}
+        self.audit_head = None
+
     def commit(self) -> None:
+        self.flush()
         self.raw.commit()
+        self.forget()
 
     def rollback(self) -> None:
         self.raw.rollback()
+        self.forget()
 
 
 def init_schema(conn: Conn) -> None:
+    """Drop and recreate every table (used by the dataset loader and generator)."""
     conn.script(SCHEMA_PATH.read_text(encoding="utf-8"))
+
+
+def schema_exists(conn: Conn) -> bool:
+    return bool(conn.val("SELECT to_regclass('public.audit_log') IS NOT NULL"))

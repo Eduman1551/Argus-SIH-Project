@@ -42,6 +42,7 @@ def _reset_sequences_sql() -> list[str]:
 def export_dump(conn: Conn, path: Path = DUMP_PATH) -> int:
     path.parent.mkdir(parents=True, exist_ok=True)
     total = 0
+    conn.flush()
     # mtime=0 keeps the gzip bytes identical for identical data
     with open(path, "wb") as raw, gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as out:
         for t in TABLES:

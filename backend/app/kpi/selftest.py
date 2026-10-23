@@ -62,7 +62,8 @@ def run_routing_selftest(c: Conn) -> dict:
             results.append({"type": t["name"], "route": t["route_code"], "expected": expected, "visited": visited,
                             "correct": visited == expected})
     finally:
-        c.run("ROLLBACK TO SAVEPOINT routing_selftest")
+        c.run("ROLLBACK TO SAVEPOINT routing_selftest")  # sends any queued writes first, then undoes them
+        c.forget()  # the cached audit head and lookups belonged to the rolled-back work
     ok = sum(r["correct"] for r in results)
     return {"results": results, "correct": ok, "total": len(results),
             "value": round(100.0 * ok / len(results), 1) if results else None,

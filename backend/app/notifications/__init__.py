@@ -38,58 +38,58 @@ def notify(
     kind: str,
     alert_id: int | None = None,
     sms: bool = False,
-) -> list[int]:
-    """Create one in-app notification per user plus simulated email (and SMS) outbox rows."""
+) -> int:
+    """Create one in-app notification per user plus simulated email (and SMS) outbox rows.
+    The inserts are queued (no result needed) and go out with the next database round trip."""
+    from app.common import users_by_id
+
     user_ids = list(dict.fromkeys(u for u in user_ids if u))  # unique, keep order
     if not user_ids:
-        return []
+        return 0
     msg = render(conn, template_code, ctx)
-    users = {u["id"]: u for u in conn.all("SELECT id, email, phone FROM users WHERE id = ANY(%s)", (user_ids,))}
-    ids = []
+    users = users_by_id(conn)
     for uid in user_ids:
-        nid = conn.val(
-            """INSERT INTO notifications (user_id, alert_id, kind, title, body, link, created_at)
-               VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id""",
-            (uid, alert_id, kind, msg["subject"], msg["body"], link, now),
-        )
-        ids.append(nid)
         u = users[uid]
-        conn.run(
-            """INSERT INTO outbox (alert_id, notification_id, user_id, channel, address, subject, body, status,
-                                   created_at, updated_at)
-               VALUES (%s, %s, %s, 'email', %s, %s, %s, 'queued', %s, %s)""",
-            (alert_id, nid, uid, u["email"], msg["subject"], msg["body"], now, now),
-        )
+        channels = [("email", u["email"], msg["subject"], msg["body"])]
         if sms:
-            conn.run(
-                """INSERT INTO outbox (alert_id, notification_id, user_id, channel, address, subject, body, status,
-                                       created_at, updated_at)
-                   VALUES (%s, %s, %s, 'sms', %s, '', %s, 'queued', %s, %s)""",
-                (alert_id, nid, uid, u["phone"], msg["sms"], now, now),
-            )
-    return ids
+            channels.append(("sms", u["phone"], "", msg["sms"]))
+        values = ", ".join(["(%s::text, %s::text, %s::text, %s::text)"] * len(channels))
+        conn.defer(
+            f"""WITH n AS (INSERT INTO notifications (user_id, alert_id, kind, title, body, link, created_at)
+                           VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id)
+                INSERT INTO outbox (alert_id, notification_id, user_id, channel, address, subject, body, status,
+                                    created_at, updated_at)
+                SELECT %s::int, n.id, %s::int, ch.channel, ch.address, ch.subject, ch.body, 'queued',
+                       %s::timestamptz, %s::timestamptz
+                FROM n, (VALUES {values}) AS ch(channel, address, subject, body)""",
+            (uid, alert_id, kind, msg["subject"], msg["body"], link, now,
+             alert_id, uid, now, now, *[v for ch in channels for v in ch]),
+        )
+    return len(user_ids)
 
 
 def progress_outbox(conn: Conn, now: datetime) -> dict:
-    """Advance simulated delivery by one step (sent -> delivered/failed, then queued -> sent)."""
-    delivered = conn.run(
-        """UPDATE outbox o SET status = 'delivered', status_reason = 'Simulated delivery receipt', updated_at = %s
-           FROM users u WHERE o.user_id = u.id AND o.status = 'sent'
-             AND (o.channel = 'email' OR u.phone_valid)""",
-        (now,),
+    """Advance simulated delivery by one step (sent -> delivered/failed, and queued -> sent).
+    Both updates read the same snapshot, so a row moves at most one step per tick. The tick calls
+    this before it fires new alerts, so new rows stay queued until the next tick."""
+    row = conn.one(
+        """WITH d AS (
+               UPDATE outbox o
+                  SET status = CASE WHEN o.channel = 'sms' AND NOT u.phone_valid THEN 'failed' ELSE 'delivered' END,
+                      status_reason = CASE WHEN o.channel = 'sms' AND NOT u.phone_valid
+                                           THEN 'Simulated: number not reachable' ELSE 'Simulated delivery receipt' END,
+                      updated_at = %(now)s
+                 FROM users u WHERE o.user_id = u.id AND o.status = 'sent'
+               RETURNING o.status),
+           s AS (
+               UPDATE outbox SET status = 'sent', status_reason = 'Simulated hand-off to gateway', updated_at = %(now)s
+                WHERE status = 'queued' RETURNING 1)
+           SELECT (SELECT count(*) FROM s) AS sent,
+                  (SELECT count(*) FROM d WHERE status = 'delivered') AS delivered,
+                  (SELECT count(*) FROM d WHERE status = 'failed') AS failed""",
+        {"now": now},
     )
-    failed = conn.run(
-        """UPDATE outbox o SET status = 'failed', status_reason = 'Simulated: number not reachable', updated_at = %s
-           FROM users u WHERE o.user_id = u.id AND o.status = 'sent' AND o.channel = 'sms' AND NOT u.phone_valid""",
-        (now,),
-    )
-    # The tick calls this before it fires new alerts, so new rows stay queued until the next tick.
-    sent = conn.run(
-        "UPDATE outbox SET status = 'sent', status_reason = 'Simulated hand-off to gateway', updated_at = %s "
-        "WHERE status = 'queued'",
-        (now,),
-    )
-    return {"sent": sent, "delivered": delivered, "failed": failed}
+    return {"sent": row["sent"], "delivered": row["delivered"], "failed": row["failed"]}
 
 
 def unread_count(conn: Conn, user_id: int) -> int:
