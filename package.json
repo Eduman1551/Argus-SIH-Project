@@ -1,0 +1,25 @@
+{
+  "name": "argus",
+  "private": true,
+  "description": "Argus: AICTE approval workflow, compliance monitoring and alert management prototype (SIH 2026, PS26262)",
+  "packageManager": "pnpm@11.9.0",
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "db:local": "node scripts/local-db.mjs",
+    "db:init": "node scripts/py.mjs scripts/db.py init",
+    "db:seed": "node scripts/py.mjs scripts/db.py seed",
+    "db:reset": "node scripts/py.mjs scripts/db.py reset",
+    "dev": "concurrently -k -n api,web -c red,yellow \"pnpm dev:api\" \"pnpm dev:web\"",
+    "dev:api": "node scripts/py.mjs -m uvicorn app.main:app --app-dir backend --reload --reload-dir backend --port 8000",
+    "dev:web": "pnpm --dir frontend dev",
+    "build": "pnpm --dir frontend build",
+    "test": "node scripts/py.mjs -m pytest -q",
+    "lint": "node scripts/py.mjs -m ruff check backend scripts api",
+    "smoke": "node scripts/py.mjs scripts/smoke.py",
+    "screens": "node scripts/screens.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "10.0.6",
+    "playwright": "1.64.1"
+  }
+}

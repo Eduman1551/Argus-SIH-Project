@@ -1,0 +1,26 @@
+# secrets
+.env
+.env.local
+.env.*.local
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# node / next
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# local postgres cluster created by `pnpm db:local`
+.pgdata/
+
+# build and test output
+.vercel/
+screenshots/
+*.log
