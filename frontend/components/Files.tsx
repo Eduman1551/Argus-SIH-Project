@@ -63,11 +63,11 @@ export function FilePicker({ entityType, entityId, slot, onUploaded, label = "At
       <input ref={input} type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg,.txt,application/pdf,image/png,image/jpeg,text/plain"
         onChange={(e) => pick(e.target.files?.[0])} />
       <button type="button" onClick={() => input.current?.click()} disabled={busy}
-        className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-line bg-paper/60 px-3 py-1.5 text-[13.5px] hover:border-brand hover:text-brand disabled:opacity-60">
+        className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-line-strong bg-surface-2 px-3 py-1.5 text-[13.5px] hover:border-brand hover:text-brand disabled:opacity-60">
         {busy ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" /> : <Upload size={14} />}
         {busy ? "Uploading…" : label}
       </button>
-      {done && <span className="inline-flex items-center gap-1 text-[13px] text-olive-ink"><Paperclip size={13} />{done}</span>}
+      {done && <span className="inline-flex items-center gap-1 text-[13px] text-brand"><Paperclip size={13} />{done}</span>}
       <span className="text-[12px] text-ink-soft">PDF, PNG, JPEG or text, up to 2 MB</span>
     </div>
   );

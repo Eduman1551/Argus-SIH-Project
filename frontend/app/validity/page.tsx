@@ -12,9 +12,9 @@ import type { TrackedDoc } from "@/lib/types";
 
 const STATES = [
   { id: "expired", label: "Expired", tone: "red" as const },
-  { id: "expiring_soon", label: "Expiring soon", tone: "ochre" as const },
+  { id: "expiring_soon", label: "Expiring soon", tone: "warn" as const },
   { id: "renewal_submitted", label: "Renewal submitted", tone: "ink" as const },
-  { id: "valid", label: "Valid", tone: "olive" as const },
+  { id: "valid", label: "Valid", tone: "good" as const },
 ];
 
 export default function ValidityPage() {

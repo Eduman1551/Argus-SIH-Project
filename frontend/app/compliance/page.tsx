@@ -32,11 +32,11 @@ export default function CompliancePage() {
             tabs={[{ id: "mine", label: "My Region" }, { id: "all", label: "All Regions" }]} />) : undefined} />
       <HelpBox id="compliance">Verify evidence from the first tab. If it is incomplete, ask the institution to resubmit with a reason. Undertakings that pass their due date are flagged and escalated automatically.</HelpBox>
       <Metrics>
-        <Stat label="Waiting for you" value={waiting.length} tone={waiting.length ? "ochre" : "olive"} hint="Evidence to verify" />
-        <Stat label="Overdue" value={count("overdue")} tone={count("overdue") ? "red" : "olive"} hint="Past the due date" />
-        <Stat label="Due soon" value={count("due_soon")} tone={count("due_soon") ? "ochre" : "ink"} hint="Reminders going out" />
+        <Stat label="Waiting for you" value={waiting.length} tone={waiting.length ? "warn" : "good"} hint="Evidence to verify" />
+        <Stat label="Overdue" value={count("overdue")} tone={count("overdue") ? "red" : "good"} hint="Past the due date" />
+        <Stat label="Due soon" value={count("due_soon")} tone={count("due_soon") ? "warn" : "ink"} hint="Reminders going out" />
         <Stat label="Open" value={count("open")} hint="Not due yet" />
-        <Stat label="Closed" value={count("closed")} tone="olive" hint="Verified and closed" />
+        <Stat label="Closed" value={count("closed")} tone="good" hint="Verified and closed" />
       </Metrics>
       <Tabs value={tab} onChange={setTab} tabs={[{ id: "verify", label: `Verification queue (${waiting.length})` }, { id: "all", label: `All undertakings (${rows.length})` }]} />
       {tab === "verify" ? (

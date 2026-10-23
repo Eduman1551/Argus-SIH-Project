@@ -69,8 +69,8 @@ export default function InstitutionHome() {
 
       <Metrics>
         <Stat label="Applications in progress" value={data.counts.in_progress} hint={`${data.counts.applications} in total`} href="/applications" />
-        <Stat label="Waiting on you" value={data.counts.actions} tone={data.counts.actions ? "ochre" : "olive"} hint="Actions with a due date" />
-        <Stat label="Overdue" value={data.counts.overdue_actions} tone={data.counts.overdue_actions ? "red" : "olive"} hint="Past their due date" />
+        <Stat label="Waiting on you" value={data.counts.actions} tone={data.counts.actions ? "warn" : "good"} hint="Actions with a due date" />
+        <Stat label="Overdue" value={data.counts.overdue_actions} tone={data.counts.overdue_actions ? "red" : "good"} hint="Past their due date" />
         <Stat label="Documents to renew" value={data.documents_attention.filter((d) => d.state !== "renewal_submitted").length}
           tone={data.documents_attention.some((d) => d.state === "expired") ? "red" : "ink"} hint="Expired or expiring soon" href="/documents" />
       </Metrics>

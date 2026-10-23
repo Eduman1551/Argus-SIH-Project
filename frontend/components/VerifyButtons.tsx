@@ -24,7 +24,7 @@ export default function VerifyButtons({ path, what }: { path: string; what: stri
       {rejecting && (
         <Modal title={`Send ${what.toLowerCase()} back`} onClose={() => setRejecting(false)}
           footer={<><Button onClick={() => setRejecting(false)}>Cancel</Button><Button kind="danger" busy={busy} disabled={remarks.trim().length < 10} onClick={() => send(false)}>Send back</Button></>}>
-          <Field label="Reason (required)" hint="Tell the institution exactly what is missing."><textarea className="input" value={remarks} onChange={(e) => setRemarks(e.target.value)} /></Field>
+          <Field label="Reason (required)" hint="Tell the institution exactly what is missing."><textarea className="field" value={remarks} onChange={(e) => setRemarks(e.target.value)} /></Field>
         </Modal>
       )}
     </div>

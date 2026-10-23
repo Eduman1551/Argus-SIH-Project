@@ -59,31 +59,6 @@
   --shadow-md: var(--shadow-md);
   --shadow-float: var(--shadow-float);
   --radius-card: 12px;
-  /* TEMPORARY aliases for pages not yet migrated to the new tokens (removed in the polish step) */
-  --color-paper: var(--bg);
-  --color-paper-2: var(--surface-2);
-  --color-card: var(--surface);
-  --color-brand-deep: var(--brand-hover);
-  --color-olive: var(--brand);
-  --color-olive-ink: var(--brand);
-  --color-olive-tint: var(--brand-tint);
-  --color-ochre: var(--amber);
-  --color-ochre-ink: var(--amber-ink);
-  --color-ochre-tint: var(--amber-tint);
-  --font-serif: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-}
-
-/* TEMPORARY class aliases (removed in the polish step) */
-@layer components {
-  .sheet { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-sm); }
-  .settle { animation: enter 220ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-  .input { width: 100%; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 8px; padding: 7px 10px; font-size: 14px; color: var(--ink); }
-  .input:focus { outline: none; border-color: var(--brand); box-shadow: var(--ring); }
-  textarea.input { min-height: 84px; resize: vertical; }
-  .ledger { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13.5px; }
-  .ledger thead th { background: var(--surface-2); color: var(--ink-soft); font-weight: 500; font-size: 12px; text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); }
-  .ledger tbody td { padding: 9px 12px; border-bottom: 1px solid var(--line); }
-  .stamp { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 500; background: var(--surface-2); }
 }
 
 @layer base {

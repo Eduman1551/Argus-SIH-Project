@@ -47,9 +47,9 @@ export default function QueuePage() {
       <HelpBox id="queue">Take the red items first. Click a row for a quick look, or press Enter on it. Reassign from the case page if a colleague has less load.</HelpBox>
       <Metrics>
         <Stat label="My tasks" value={data.mine.length} hint="Cases waiting for your action" />
-        <Stat label="My overdue" value={overdue} tone={overdue ? "red" : "olive"} hint="Past their time limit" />
-        <Stat label="Evidence to verify" value={data.evidence.length} tone={data.evidence.length ? "ochre" : "ink"} href="/compliance" hint="Undertaking submissions" />
-        <Stat label="Renewals to verify" value={data.renewals.length} tone={data.renewals.length ? "ochre" : "ink"} href="/validity" hint="Renewed documents" />
+        <Stat label="My overdue" value={overdue} tone={overdue ? "red" : "good"} hint="Past their time limit" />
+        <Stat label="Evidence to verify" value={data.evidence.length} tone={data.evidence.length ? "warn" : "ink"} href="/compliance" hint="Undertaking submissions" />
+        <Stat label="Renewals to verify" value={data.renewals.length} tone={data.renewals.length ? "warn" : "ink"} href="/validity" hint="Renewed documents" />
       </Metrics>
 
       <Card title="My tasks" subtitle="Nearest deadline first. The bar shows time used in the current stage." pad={false} className="mb-6">

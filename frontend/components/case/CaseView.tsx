@@ -468,7 +468,7 @@ function DeficiencyModal({ close, data }: MP) {
         <textarea className="field" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Faculty list is short of the required cadre ratio. Upload revised faculty details." />
       </Field>
       <Field label="Days the institution has to reply" hint="Default comes from the Rules page (illustrative).">
-        <input type="number" min={1} max={60} className="input max-w-[120px]" value={days} onChange={(e) => setDays(Number(e.target.value))} />
+        <input type="number" min={1} max={60} className="field max-w-[120px]" value={days} onChange={(e) => setDays(Number(e.target.value))} />
       </Field>
       <div className="rounded-xl border border-line bg-surface-2 p-3">
         <div className="mb-2 flex items-center justify-between gap-2">
@@ -622,7 +622,7 @@ function ScheduleModal({ close, data }: MP) {
           ))}</div>
         </Field>
       ) : <p className="text-[14px] text-ink-soft">No common date yet; you can still pick one.</p>}
-      <Field label="Visit date"><input type="date" className="input max-w-[200px]" min={addDays(today, 1)} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+      <Field label="Visit date"><input type="date" className="field max-w-[200px]" min={addDays(today, 1)} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
     </Modal>
   );
 }
@@ -657,7 +657,7 @@ function AvailabilityModal({ close, data }: MP) {
           <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-7">
             {days.map((d) => (
               <button key={d} onClick={() => setSel(sel.includes(d) ? sel.filter((x) => x !== d) : sel.length < 10 ? [...sel, d] : sel)}
-                className={`rounded-md border px-1 py-1.5 text-[12.5px] ${sel.includes(d) ? "border-brand bg-brand text-white" : "border-line bg-card hover:border-brand"}`}>{fmtDate(d).slice(0, 6)}</button>
+                className={`rounded-md border px-1 py-1.5 text-[12.5px] ${sel.includes(d) ? "border-brand bg-brand text-white" : "border-line bg-surface hover:border-brand"}`}>{fmtDate(d).slice(0, 6)}</button>
             ))}
           </div>
         </Field>

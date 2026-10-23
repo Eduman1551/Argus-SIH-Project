@@ -50,8 +50,8 @@ export default function UndertakingsPage() {
       <Metrics>
         <Stat label="Open" value={open.length} />
         <Stat label="Overdue" value={open.filter((u) => u.state === "overdue").length} tone="red" />
-        <Stat label="Awaiting verification" value={open.filter((u) => u.state === "awaiting_verification").length} tone="ochre" />
-        <Stat label="Closed" value={closed.length} tone="olive" />
+        <Stat label="Awaiting verification" value={open.filter((u) => u.state === "awaiting_verification").length} tone="warn" />
+        <Stat label="Closed" value={closed.length} tone="good" />
       </Metrics>
 
       <div className="space-y-3">

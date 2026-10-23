@@ -51,7 +51,7 @@ export default function CommitteeCases() {
         case summary and record the committee&apos;s recommendation. Your recommendation is advice to the competent authority, not a decision.
       </HelpBox>
       <Metrics>
-        <Stat label="Waiting on you" value={data.counts.actions} tone={data.counts.actions ? "ochre" : "olive"} hint="Steps that need your input" />
+        <Stat label="Waiting on you" value={data.counts.actions} tone={data.counts.actions ? "warn" : "good"} hint="Steps that need your input" />
         <Stat label="Open visits" value={data.counts.visits_open} hint="Expert visits you are on" />
         <Stat label="Reviews pending" value={data.counts.reviews_pending} hint="SAC/SHC cases before you" />
       </Metrics>

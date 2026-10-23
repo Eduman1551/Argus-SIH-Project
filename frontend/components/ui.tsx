@@ -198,9 +198,9 @@ export function CountUp({ value, duration = 600 }: { value: number; duration?: n
 
 /** A metric inside a <Metrics> strip (one surface with hairline dividers, not a grid of cards). */
 export function Stat({ label, value, hint, tone, href }: {
-  label: string; value: ReactNode; hint?: ReactNode; tone?: "red" | "ochre" | "olive" | "ink"; href?: string;
+  label: string; value: ReactNode; hint?: ReactNode; tone?: "red" | "warn" | "good" | "ink"; href?: string;
 }) {
-  const color = { red: "text-danger-ink", ochre: "text-warn-ink", olive: "text-brand", ink: "text-ink" }[tone ?? "ink"];
+  const color = { red: "text-danger-ink", warn: "text-warn-ink", good: "text-brand", ink: "text-ink" }[tone ?? "ink"];
   const body = (
     <div className="h-full px-4 py-3">
       <div className="text-[12px] font-medium text-ink-soft">{label}</div>

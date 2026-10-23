@@ -86,8 +86,8 @@ export default function OfficialDashboard() {
 
       <Metrics>
         <Stat label="Cases in progress" value={t.cases} hint={`Average age ${data.avg_age_days} days`} href="/applications?status=in_progress" />
-        <Stat label="Overdue" value={t.overdue} tone={t.overdue ? "red" : "olive"} hint="Past their time limit" href="/applications?sla=overdue" />
-        <Stat label="Due soon" value={t.due_soon} tone={t.due_soon ? "ochre" : "ink"} hint="Inside the due-soon window" href="/applications?sla=due_soon" />
+        <Stat label="Overdue" value={t.overdue} tone={t.overdue ? "red" : "good"} hint="Past their time limit" href="/applications?sla=overdue" />
+        <Stat label="Due soon" value={t.due_soon} tone={t.due_soon ? "warn" : "ink"} hint="Inside the due-soon window" href="/applications?sla=due_soon" />
         <Stat label="Escalated" value={t.escalated} tone={t.escalated ? "red" : "ink"}
           hint={<span className="mono">L1 {data.escalations_by_level["1"] ?? 0} · L2 {data.escalations_by_level["2"] ?? 0} · L3 {data.escalations_by_level["3"] ?? 0}</span>} href="/escalations" />
         <Stat label="With institutions" value={t.waiting_on_institution} hint="Deficiency replies awaited" href="/applications" />

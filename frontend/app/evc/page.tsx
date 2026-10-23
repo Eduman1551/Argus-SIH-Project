@@ -44,9 +44,9 @@ export default function EvcBoard() {
       </HelpBox>
       <Metrics>
         <Stat label="Open visits" value={data.visits.length - completed} hint={all ? "All Regions" : user.region_name ?? ""} />
-        <Stat label="Due now" value={by("due").length} tone={by("due").length ? "ochre" : "ink"} hint={`Visit within ${data.window_days} days`} />
-        <Stat label="Delayed" value={delayed} tone={delayed ? "red" : "olive"} hint="A step past its limit" />
-        <Stat label="Completed" value={completed} tone="olive" hint="Report reviewed" />
+        <Stat label="Due now" value={by("due").length} tone={by("due").length ? "warn" : "ink"} hint={`Visit within ${data.window_days} days`} />
+        <Stat label="Delayed" value={delayed} tone={delayed ? "red" : "good"} hint="A step past its limit" />
+        <Stat label="Completed" value={completed} tone="good" hint="Report reviewed" />
       </Metrics>
       {data.visits.length === 0 ? <Empty title="No expert visits yet.">Visits appear here when a case reaches its EVC stage.</Empty> : (
         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">

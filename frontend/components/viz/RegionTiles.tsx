@@ -6,7 +6,7 @@ import { RAMP } from "@/components/charts";
 const PLACE: Record<string, [number, number]> = {
   NR: [1, 0], NER: [3, 0], WR: [0, 1], CR: [1, 1], ER: [2, 1], SWR: [1, 2], SR: [2, 2],
 };
-const RED_RAMP = ["#fbe4e0", "#f4c3bb", "#e59487", "#d06353", "#c0392b"];
+const RED_RAMP = ["#fbe4e0", "#f4c3bb", "#e59487", "#b84a3c", "#a93226"];
 
 export interface RegionStat { region_id: number; code: string; region: string; cases: number; overdue: number }
 
@@ -34,12 +34,12 @@ export function RegionTiles({ data, metric, value, onChange }: {
             style={{ gridColumn: col + 1, gridRow: row + 1, background: bg }}
             className={`flex flex-col justify-between rounded-xl p-2.5 text-left transition-transform hover:-translate-y-0.5 ${on ? "ring-2 ring-ink ring-offset-2 ring-offset-surface" : "ring-1 ring-inset ring-black/5"} ${dark ? "text-white" : "text-ink"}`}>
             <span className="flex items-baseline justify-between gap-1">
-              <span className="mono text-[11.5px] font-semibold opacity-80">{d.code}</span>
+              <span className="mono text-[11.5px] font-semibold">{d.code}</span>
               <span className="mono text-[20px] font-semibold leading-none tracking-[-0.03em]">{v}</span>
             </span>
             <span className="text-[12px] leading-tight">
               {d.region}
-              <span className={`block text-[11px] ${dark ? "text-white/85" : "text-ink/75"}`}>
+              <span className={`block text-[11px] ${dark ? "text-white" : "text-ink/75"}`}>
                 {metric === "cases" ? (d.overdue ? `${d.overdue} overdue` : "none overdue") : `of ${d.cases} cases`}
               </span>
             </span>

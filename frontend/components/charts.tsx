@@ -7,7 +7,7 @@ import {
 /** Chart palette: a teal ramp for normal data; amber and red only for exceptions (due soon, overdue). */
 export const C = {
   ink: "#17201f", soft: "#5f6b68", line: "#e4e2da", grid: "#ecebe5",
-  t1: "#d5ebe7", t2: "#a8d4cc", t3: "#6fb3a8", t4: "#2f857d", t5: "#0f5e5a",
+  t1: "#d5ebe7", t2: "#a8d4cc", t3: "#6fb3a8", t4: "#28766f", t5: "#0f5e5a",
   slate: "#a9b3b0", amber: "#b7791f", red: "#c0392b",
 };
 export const RAMP = [C.t1, C.t2, C.t3, C.t4, C.t5];
