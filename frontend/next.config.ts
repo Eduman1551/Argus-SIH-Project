@@ -8,6 +8,7 @@ const apiOrigin = process.env.ARGUS_API_ORIGIN ?? "http://127.0.0.1:8000";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  agentRules: false,
   turbopack: { root: path.resolve(__dirname) },
   async rewrites() {
     if (process.env.NODE_ENV === "production" && !process.env.ARGUS_API_ORIGIN) return [];
