@@ -95,6 +95,9 @@ def template_summary(f: dict) -> str:
     return "\n".join(lines)
 
 
+SUMMARY_CLOSING = "This summary is compiled from case records. It does not recommend an outcome."
+
+
 def case_summary(facts: dict, use_llm: bool = False) -> tuple[str, str]:
     """Returns (text, source) where source is 'llm' or 'template'."""
     base = template_summary(facts)
@@ -106,14 +109,20 @@ def case_summary(facts: dict, use_llm: bool = False) -> tuple[str, str]:
         )
         text = _complete(prompt)
         if text:
+            # the model is asked to keep this sentence; make sure of it rather than trust it
+            if SUMMARY_CLOSING not in text:
+                text = f"{text.rstrip()}\n\n{SUMMARY_CLOSING}"
             return text, "llm"
     return base, "template"
 
 
 # ------------------------------------------------------------------ letters
+LETTER_LABEL = "SYNTHETIC DATA - prototype draft, not an official AICTE letter"
+
+
 def template_letter(kind: str, f: dict) -> str:
     head = [
-        "SYNTHETIC DATA - prototype draft, not an official AICTE letter",
+        LETTER_LABEL,
         "",
         f"To: The Principal / Director, {f['institution']}, {f['city']}",
         f"Subject: {'Deficiency in' if kind == 'deficiency' else 'Reminder regarding'} application {f['ref_no']}",
@@ -150,5 +159,7 @@ def draft_letter(kind: str, facts: dict, use_llm: bool = False) -> tuple[str, st
             "the first line unchanged, and do not add any decision.\n\n" + base,
         )
         if text:
-            return text, "llm"
+            # the label must head every draft, whatever the model returns
+            body = "\n".join(line for line in text.splitlines() if "SYNTHETIC DATA" not in line).strip()
+            return f"{LETTER_LABEL}\n\n{body}", "llm"
     return base, "template"
