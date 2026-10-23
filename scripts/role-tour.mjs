@@ -5,9 +5,10 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { webUrl } from "./ports.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const base = process.env.ARGUS_URL ?? "http://localhost:3000";
+const base = webUrl(); // http://localhost:WEB_PORT (default 3001), or ARGUS_URL
 const [width, height] = (process.env.SIZE ?? "1366x768").split("x").map(Number);
 const channel = process.env.PW_CHANNEL ?? "msedge";
 const out = path.join(root, "screenshots");
@@ -18,6 +19,11 @@ const page = await (await browser.newContext({ viewport: { width, height } })).n
 const errors = [];
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
 page.on("pageerror", (e) => errors.push(String(e)));
+const network = [];
+page.on("requestfailed", (r) => network.push(`${r.method()} ${r.url()} failed: ${r.failure()?.errorText}`));
+page.on("response", (r) => { if (r.status() >= 400) network.push(`${r.request().method()} ${r.url()} -> ${r.status()}`); });
+let apiCalls = 0;
+page.on("response", (r) => { if (new URL(r.url()).pathname.startsWith("/api/") && r.ok()) apiCalls += 1; });
 
 // first sign-in from the welcome page, then switch with the top-bar menu
 await page.goto(`${base}/welcome`, { waitUntil: "networkidle" });
@@ -32,6 +38,8 @@ const tour = [
 let failed = false;
 for (const stop of tour) {
   errors.length = 0;
+  network.length = 0;
+  apiCalls = 0;
   if (stop.name) {
     await page.getByRole("button", { name: /^Switch demo user/ }).click();
     await page.getByRole("menuitem", { name: stop.name }).click();
@@ -44,8 +52,9 @@ for (const stop of tour) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   const file = path.join(out, `role-${stop.role}_${width}.png`);
   await page.screenshot({ path: file, fullPage: false });
-  console.log(`${stop.role.padEnd(11)} heading ok | clock visible: ${clock} (${date}) | overflow ${overflow}px | console errors: ${errors.length}`);
-  if (errors.length) { failed = true; console.log("   " + errors.slice(0, 3).join("\n   ")); }
+  console.log(`${stop.role.padEnd(11)} heading ok | clock visible: ${clock} (${date}) | overflow ${overflow}px | ` +
+    `API calls ok: ${apiCalls} | console errors: ${errors.length} | network errors: ${network.length}`);
+  if (errors.length || network.length) { failed = true; console.log("   " + [...errors, ...network].slice(0, 4).join("\n   ")); }
 }
 await browser.close();
 process.exit(failed ? 1 : 0);

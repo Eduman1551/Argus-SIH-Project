@@ -1,66 +1,48 @@
-// Frees ports 3000 (web) and 8000 (API) before `pnpm dev`.
-// Stops a listener only if its command line points into this project folder; anything else is
-// reported and left running, so you can decide what to do with it.
+// Stops the Argus dev servers: only processes listening on the Argus dev ports (API_PORT and
+// WEB_PORT, default 8001 and 3001) whose command line points into this project folder. Anything
+// else on those ports is reported and left running. Other projects' ports (e.g. 8000/3000) are
+// never touched.
 import { execFileSync } from "node:child_process";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { isArgus, listeners, ports, processInfo } from "./ports.mjs";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const PORTS = [3000, 8000];
+const { api, web } = ports();
 const isWin = process.platform === "win32";
 
-function ps(cmd) {
-  return execFileSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", cmd], { encoding: "utf8" }).trim();
-}
-
-function listeners(port) {
-  try {
-    if (isWin) {
-      const out = ps(`(Get-NetTCPConnection -LocalPort ${port} -State Listen -ErrorAction SilentlyContinue).OwningProcess | Sort-Object -Unique`);
-      return out ? out.split(/\s+/).map(Number).filter(Boolean) : [];
-    }
-    const out = execFileSync("lsof", ["-t", `-iTCP:${port}`, "-sTCP:LISTEN"], { encoding: "utf8" }).trim();
-    return out ? out.split(/\s+/).map(Number) : [];
-  } catch {
-    return [];
-  }
-}
-
-function commandLine(pid) {
-  try {
-    if (isWin) return ps(`(Get-CimInstance Win32_Process -Filter "ProcessId=${pid}").CommandLine`);
-    return execFileSync("ps", ["-o", "command=", "-p", String(pid)], { encoding: "utf8" }).trim();
-  } catch {
-    return "";
+function stopTree(pid) {
+  if (isWin) {
+    // /T also stops child processes (Next.js runs its server in a child process)
+    execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
+  } else {
+    process.kill(pid);
   }
 }
 
 let blocked = false;
-for (const port of PORTS) {
+for (const [port, label] of [[api, "API"], [web, "web"]]) {
   const pids = listeners(port);
   if (!pids.length) {
-    console.log(`port ${port}: free`);
+    console.log(`port ${port} (${label}): free`);
     continue;
   }
   for (const pid of pids) {
     // stopping one dev server can stop its sibling (concurrently -k), so re-check first
     if (!listeners(port).includes(pid)) {
-      console.log(`port ${port}: free (process ${pid} already exited)`);
+      console.log(`port ${port} (${label}): free (process ${pid} already exited)`);
       continue;
     }
-    const cmd = commandLine(pid);
-    const ours = cmd.toLowerCase().includes(root.toLowerCase());
-    if (ours) {
+    const info = processInfo(pid);
+    if (isArgus(info)) {
       try {
-        process.kill(pid);
-        console.log(`port ${port}: stopped Argus process ${pid}`);
+        stopTree(pid);
+        console.log(`port ${port} (${label}): stopped Argus ${info.name} (PID ${pid})`);
       } catch (e) {
         blocked = true;
-        console.log(`port ${port}: could not stop process ${pid} (${e.code ?? e.message})`);
+        console.log(`port ${port} (${label}): could not stop ${info.name} (PID ${pid}): ${e.message}`);
       }
     } else {
       blocked = true;
-      console.log(`port ${port}: held by process ${pid}, not part of this project. Left running:\n    ${cmd || "(command line not readable)"}`);
+      console.log(`port ${port} (${label}): held by ${info.name || "a process"} (PID ${pid}), which is not part of Argus. Left running.`);
+      console.log(`    Close it yourself, or set ${label === "API" ? "API_PORT" : "WEB_PORT"}=<free port> in .env.`);
     }
   }
 }
