@@ -284,7 +284,8 @@ def run_alert_tick(conn: Conn, now: datetime, resolve: bool = True) -> dict:
     today = ist_date(now)
     delivery = notifications.progress_outbox(conn, now)
 
-    fired = {"alerts": 0, "escalations": 0, "notifications": 0, "resolved": 0}
+    fired = {"alerts": 0, "escalations": 0, "notifications": 0, "resolved": 0, "reminders": 0, "overdue": 0,
+             "escalated_l1": 0, "escalated_l2": 0, "escalated_l3": 0}
     candidates = conn.all(CANDIDATES_SQL, {"today": today})
     if candidates:
         # Under the tick lock nobody else inserts alerts, so ids can be handed out here and the
@@ -297,6 +298,11 @@ def run_alert_tick(conn: Conn, now: datetime, resolve: bool = True) -> dict:
             fired["alerts"] += 1
             fired["escalations"] += int(res["escalation"])
             fired["notifications"] += res["notified"]
+            # breakdown for the clock toast ("12 reminders sent, 3 items overdue, 1 escalated to L2")
+            if it["kind"] == "escalation":
+                fired[f"escalated_l{it['level']}"] += 1
+            else:
+                fired["reminders" if it["kind"] == "reminder" else "overdue"] += 1
         conn.defer("SELECT setval(pg_get_serial_sequence('alerts', 'id'), %s)", (next_id + len(candidates) - 1,))
 
     if resolve:

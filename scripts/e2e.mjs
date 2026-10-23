@@ -72,8 +72,9 @@ await step("official assigns EVC members", async () => {
 });
 
 await step("clock +7d fires alerts", async () => {
-  await click("Advance the clock by 7 days");
-  await expectText(/alert\(s\) fired/);
+  await page.getByRole("button", { name: /^Simulated date/ }).click();
+  await page.getByRole("button", { name: "+7 days" }).click();
+  await expectText(/7 days advanced: \d+ reminders? sent/);
 });
 
 await step("institution uploads undertaking evidence", async () => {

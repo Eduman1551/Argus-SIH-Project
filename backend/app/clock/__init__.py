@@ -75,7 +75,8 @@ def advance(conn: Conn, days: int, actor: dict | None) -> dict:
     if not 1 <= days <= MAX_ADVANCE_DAYS:
         raise ValueError(f"days must be between 1 and {MAX_ADVANCE_DAYS}")
     start = now(conn)
-    totals = {"alerts": 0, "escalations": 0, "notifications": 0}
+    totals = {"alerts": 0, "escalations": 0, "notifications": 0, "reminders": 0, "overdue": 0,
+              "escalated_l1": 0, "escalated_l2": 0, "escalated_l3": 0}
     # Finish the current day first, so anything created today gets its same-day reminders.
     first = run_alert_tick(conn, start)
     for k in totals:

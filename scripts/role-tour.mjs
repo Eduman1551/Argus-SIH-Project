@@ -47,8 +47,9 @@ for (const stop of tour) {
   await page.getByRole("heading", { level: 1, name: stop.heading }).waitFor({ timeout: 30000 });
   await page.waitForLoadState("networkidle");
   await page.waitForTimeout(1200);
-  const clock = await page.getByText("Simulated date").isVisible();
-  const date = (await page.locator("text=Simulated date").locator("xpath=following-sibling::div[1]").textContent())?.trim();
+  const chip = page.getByRole("button", { name: /^Simulated date/ });
+  const clock = await chip.isVisible();
+  const date = (await chip.textContent())?.trim();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   const file = path.join(out, `role-${stop.role}_${width}.png`);
   await page.screenshot({ path: file, fullPage: false });
