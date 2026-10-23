@@ -199,7 +199,9 @@ CREATE TABLE application_stages (
     remarks          text,
     UNIQUE (application_id, seq, attempt)
 );
-ALTER TABLE applications ADD FOREIGN KEY (current_stage_id) REFERENCES application_stages(id);
+-- Deferrable so the dataset loader can insert applications before their stages.
+ALTER TABLE applications ADD CONSTRAINT applications_current_stage_fk FOREIGN KEY (current_stage_id)
+    REFERENCES application_stages(id) DEFERRABLE INITIALLY IMMEDIATE;
 CREATE INDEX ON application_stages (application_id);
 CREATE INDEX ON application_stages (status, assigned_to);
 
@@ -325,6 +327,7 @@ CREATE TABLE tracked_documents (
     renewal_submitted_at  timestamptz,
     verified_at           timestamptz,
     verified_by           int REFERENCES users(id),
+    rejected_at           timestamptz,
     remarks               text,
     tracked_since         timestamptz NOT NULL
 );
