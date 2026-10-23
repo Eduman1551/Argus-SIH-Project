@@ -319,7 +319,8 @@ function RoleSwitcher({ user }: { user: SessionUser }) {
   const featured = users.filter((u) => u.featured);
   return (
     <div className="relative" ref={ref}>
-      <button onClick={() => setOpen(!open)} className="flex items-center gap-2 rounded-md border border-line bg-card px-2.5 py-1.5 text-left hover:border-brand/50" aria-haspopup="menu" aria-expanded={open}>
+      <button onClick={() => setOpen(!open)} className="flex items-center gap-2 rounded-md border border-line bg-card px-2.5 py-1.5 text-left hover:border-brand/50"
+        aria-haspopup="menu" aria-expanded={open} aria-label={`Switch demo user. Signed in as ${user.name}, ${ROLE_TEXT[user.role]}`}>
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-tint font-serif text-[13px] font-bold text-brand-deep">
           {user.name.replace(/^(Dr\.|Prof\.)\s*/, "").split(" ").map((p) => p[0]).slice(0, 2).join("")}
         </span>

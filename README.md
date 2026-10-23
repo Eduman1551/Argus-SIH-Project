@@ -52,23 +52,29 @@ Details: [docs/DETAILS.md](docs/DETAILS.md).
 Needs Python 3.11 to 3.13, Node 20+, pnpm and PostgreSQL 14+.
 
 ```powershell
-copy .env.example .env      # then set DATABASE_URL (GROQ_API_KEY is optional)
+copy .env.example .env      # copy, do not rename; then set DATABASE_URL (GROQ_API_KEY is optional)
 pnpm run setup              # venv + packages, frontend packages, tables, synthetic data
+pnpm dev:clean              # free ports 3000 and 8000 if an old Argus dev server still holds them
 pnpm dev                    # API on :8000, web on :3000
 ```
 
 Open http://localhost:3000 and pick a demo user. `pnpm run setup` must be written with `run`,
-because `pnpm setup` is a built-in pnpm command.
+because `pnpm setup` is a built-in pnpm command. Setup is safe to repeat.
+
+Works with Neon: use the pooled connection string with `sslmode=require`. Over the internet each query
+costs a round trip (about 90 ms from India to a Neon region), so the app batches writes and caches lookups
+per request; on Vercel, next to the database, everything is much faster.
 
 No Postgres password at hand? `pnpm db:local` starts a project-local cluster on port 5433 (needs the
 PostgreSQL `bin` folder on PATH); use `DATABASE_URL=postgresql://argus@localhost:5433/argus`.
 
 | Command | What it does |
 |---|---|
-| `pnpm db:init` / `pnpm db:seed` | create tables / load the synthetic dataset (`data/seed.copy.gz`) |
-| `pnpm db:generate` | rebuild the dataset by replaying ~300 simulated days through the engines (deterministic) |
+| `pnpm db:init` | create the tables if they do not exist (never drops data; safe to repeat) |
+| `pnpm db:seed` | replace all data with the synthetic dataset (`data/seed.copy.gz`); repeating it never duplicates |
+| `pnpm db:generate` | rebuild the dataset by replaying ~300 simulated days through the engines (deterministic; run it on a local database) |
 | `pnpm db:reset` | restore the seeded state (same as the Reset button) |
-| `pnpm test` | 39 pytest tests (uses a separate `<db>_test` database) |
+| `pnpm test` | 39 pytest tests in a separate `<db>_test` database; the dataset regeneration test runs only on a local database or with `ARGUS_SLOW_TESTS=1` |
 | `pnpm smoke` | headless demo scenario through the API, prints the KPI table |
 | `pnpm e2e` | Playwright click-through of the demo path in the real UI (needs `pnpm dev`; uses installed Edge) |
 | `pnpm screens <user> <paths…>` | screenshots at 1366x768 and 1920x1080 |
