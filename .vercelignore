@@ -1,0 +1,8 @@
+.venv
+.pgdata
+screenshots
+**/__pycache__
+**/node_modules
+.pytest_cache
+.ruff_cache
+backend/tests
