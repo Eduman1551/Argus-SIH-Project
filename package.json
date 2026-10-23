@@ -17,7 +17,8 @@
     "test": "node scripts/py.mjs -m pytest -q",
     "lint": "node scripts/py.mjs -m ruff check backend scripts api",
     "smoke": "node scripts/py.mjs scripts/smoke.py",
-    "screens": "node scripts/screens.mjs"
+    "screens": "node scripts/screens.mjs",
+    "e2e": "node scripts/e2e.mjs"
   },
   "devDependencies": {
     "concurrently": "10.0.6",
