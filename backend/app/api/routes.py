@@ -67,7 +67,8 @@ def demo_users():
                                u.committee_kind, i.name AS institution, r.name AS region
                         FROM users u LEFT JOIN institutions i ON i.id = u.institution_id
                         LEFT JOIN regions r ON r.id = COALESCE(u.region_id, i.region_id)
-                        ORDER BY u.featured DESC, u.role, u.official_kind NULLS LAST, u.rank DESC NULLS LAST, u.name""")
+                        ORDER BY u.featured DESC, u.role, u.official_kind DESC NULLS LAST, u.rank NULLS LAST,
+                                 u.committee_kind NULLS LAST, u.name""")
     return {"users": rows, "note": "Demo sign-in. Real login and SSO are future scope."}
 
 
