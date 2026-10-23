@@ -1,18 +1,24 @@
 "use client";
 
-import Link from "next/link";
 import { useState, type ReactNode } from "react";
-import { ArrowRightLeft, CalendarCheck2, Check, CheckCircle2, CornerUpLeft, FileSignature, Gavel, Hourglass, MessageSquareWarning, PencilLine, RefreshCw, Send, Sparkles, Undo2, UserRoundCog, Users } from "lucide-react";
+import {
+  ArrowRightLeft, CalendarCheck2, Check, CheckCircle2, CornerUpLeft, FileSignature, Gavel, Hourglass, MessageSquareWarning,
+  PencilLine, RefreshCw, Send, Sparkles, Undo2, UserRoundCog, Users,
+} from "lucide-react";
 import { FileList, FilePicker, type FileRow } from "@/components/Files";
+import { UndertakingState } from "@/components/status";
 import Timeline, { type AuditEntry } from "@/components/Timeline";
-import { Button, Card, DraftLabel, DueCell, ErrorNote, Field, KeyVal, Modal, NextStep, PageHeader, PageSkeleton, SlaStamp, Stamp, Table } from "@/components/ui";
-import { UndertakingState } from "@/components/home/InstitutionHome";
+import {
+  Button, Callout, Card, DocLayout, DraftLabel, DueCell, ErrorNote, Field, KeyVal, Modal, NextStep, Owner, PageHeader, PageSkeleton,
+  Section, SlaStamp, Stamp, Table,
+} from "@/components/ui";
+import { EscalationLadder, nextStep, rungsFor, useEscalationRules } from "@/components/viz/EscalationLadder";
+import { SlaBar, SlaLegend, rowSla, useReminderTicks } from "@/components/viz/SlaBar";
 import { act, api, useApi } from "@/lib/api";
 import { addDays, dueText, fmtDate, fmtDateTime } from "@/lib/format";
-import { DECISION_TEXT, RECOMMENDATION_TEXT, REPORT_OUTCOME_TEXT, STAGE_NAME, WAITING_TEXT } from "@/lib/labels";
+import { DECISION_TEXT, ENTITY_TEXT, RECOMMENDATION_TEXT, REPORT_OUTCOME_TEXT, STAGE_NAME, WAITING_TEXT } from "@/lib/labels";
 import { useApp, type SessionUser } from "@/lib/store";
 import type { Member, PendencyRow, Undertaking } from "@/lib/types";
-import { rowSla } from "@/components/viz/SlaBar";
 
 /* ---------------------------------------------------------------- payload */
 interface RouteStep { seq: number; code: string; name: string; state: string; attempts: number; assignee: string | null;
@@ -27,6 +33,7 @@ interface Review { id: number; status: string; summary: string; summary_source: 
   recommendation_text: string | null; remarks: string | null; recommended_by_name: string | null; recommended_at: string | null;
   members: { id: number; name: string; designation: string }[] }
 interface Official { id: number; name: string; designation: string; rank: number; official_kind: string; load: number }
+interface CaseAlert { id: number; kind: string; level: number | null; title: string; fired_at: string; entity_type: string; entity_id: number; due_date: string }
 export interface CaseDetail {
   application: { id: number; ref_no: string; institution: string; city: string; region: string; type_name: string; route_name: string;
     programme: string; academic_year: string; status: string; decision: string | null; decision_reason: string | null;
@@ -36,7 +43,7 @@ export interface CaseDetail {
     started_at: string; paused_at: string | null; seq: number } | null;
   sla: PendencyRow | null; deficiencies: Deficiency[]; visit: VisitDetail | null; review: Review | null;
   undertakings: Undertaking[]; files: FileRow[]; timeline: AuditEntry[];
-  alerts: { id: number; kind: string; level: number | null; title: string; fired_at: string }[];
+  alerts: CaseAlert[];
   actions: string[];
   options: { officials?: Official[]; evc_members?: { id: number; name: string; designation: string; load: number }[];
     sac_members?: { id: number; name: string; designation: string }[]; revert_targets?: string[] };
@@ -47,7 +54,7 @@ export function caseSla(d: CaseDetail, today: string) {
   return d.sla && d.application.status === "in_progress" ? rowSla(d.sla, today) : null;
 }
 
-type ModalKind =null | "complete" | "deficiency" | "reassign" | "revert" | "decision" | "members" | "schedule" | "review_report"
+type ModalKind = null | "complete" | "deficiency" | "reassign" | "revert" | "decision" | "members" | "schedule" | "review_report"
   | "respond" | "committee" | "availability" | "report" | "recommend";
 
 /* ---------------------------------------------------------------- page */
@@ -60,38 +67,51 @@ export default function CaseView({ appId, mode = "case" }: { appId: number; mode
   const a = data.application;
   const close = () => setModal(null);
   const has = (x: string) => data.actions.includes(x);
+  const escalations = data.alerts.filter((al) => al.kind === "escalation");
 
-  const primary = primaryAction(data, has, setModal);
-  const backHref = user.role === "committee" ? "/my-cases" : "/applications";
+  const crumbs = user.role === "committee"
+    ? [{ label: "My cases", href: "/my-cases" }, { label: mode === "visit" ? "Expert visit" : "SAC/SHC review" }, { label: a.ref_no }]
+    : user.role === "institution"
+      ? [{ label: "Institution", href: "/" }, { label: "Applications", href: "/applications" }, { label: a.ref_no }]
+      : [{ label: "Cases" }, { label: "Applications", href: "/applications" }, { label: a.ref_no }];
+
+  const toc = [
+    { id: "status", label: a.status === "decided" ? "Decision" : "Where it stands" },
+    ...(escalations.length ? [{ id: "escalation", label: "Escalation" }] : []),
+    ...(mode === "committee" && data.review ? [{ id: "committee", label: "SAC/SHC review" }] : []),
+    ...(mode === "visit" && data.visit ? [{ id: "visit", label: "Expert visit" }] : []),
+    ...(data.deficiencies.length ? [{ id: "deficiencies", label: "Deficiencies" }] : []),
+    ...(mode !== "visit" && data.visit ? [{ id: "visit", label: "Expert visit" }] : []),
+    ...(mode !== "committee" && data.review ? [{ id: "committee", label: "SAC/SHC review" }] : []),
+    ...(data.undertakings.length ? [{ id: "undertakings", label: "Undertakings" }] : []),
+    { id: "documents", label: "Documents" },
+    { id: "timeline", label: "Timeline" },
+  ];
 
   return (
     <div>
-      <div className="mb-2 text-[13px]"><Link href={backHref} className="no-underline">← {user.role === "committee" ? "My cases" : "Applications"}</Link></div>
-      <PageHeader kicker={`${a.type_name} · ${a.region} Region`} title={`${a.ref_no}`}
-        description={`${a.institution}, ${a.city} · ${a.programme} · Academic year ${a.academic_year}`} action={primary} />
+      <PageHeader crumbs={crumbs} title={<span className="mono tracking-[-0.03em]">{a.ref_no}</span>}
+        description={<>{a.institution}, {a.city} · {a.programme} · {a.type_name} · <span className="mono">{a.academic_year}</span></>}
+        action={primaryAction(data, has, setModal)} />
 
-      <RouteBar route={data.route} decided={a.status === "decided"} />
+      <RouteLine route={data.route} decided={a.status === "decided"} />
 
-      {a.status === "decided" && (
-        <div className="sheet settle mb-5 flex flex-wrap items-center gap-3 border-l-4 border-l-olive px-4 py-3">
-          <Gavel className="text-olive-ink" size={20} />
-          <div className="min-w-0 flex-1 text-[14px]">
-            <div className="font-semibold">Decision recorded: {DECISION_TEXT[a.decision ?? ""]}</div>
-            <div className="text-ink-soft">{a.decision_reason} · by {a.decided_by_name} on {fmtDate(a.decided_at)}. Recorded by a human authority, not by Argus.</div>
-          </div>
-        </div>
-      )}
+      <DocLayout toc={toc}>
+        <div className="space-y-5">
+          <Card id="status" title={a.status === "decided" ? "Decision" : `Now: ${STAGE_NAME[data.current?.stage_code ?? ""] ?? ""}`}
+            subtitle={a.status === "decided" ? "Recorded by the competent authority, not by Argus" : data.sla?.substatus_text}
+            action={a.status === "in_progress" && data.sla ? <SlaStamp status={data.sla.sla_status} days={data.sla.days_to_due} level={data.sla.escalation_level} waitingOn={data.sla.waiting_on} /> : undefined}>
+            {a.status === "decided" ? <DecisionBlock data={data} /> : data.current && <CurrentStage data={data} has={has} open={setModal} />}
+          </Card>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="min-w-0 space-y-5">
+          {escalations.length > 0 && <EscalationCard data={data} />}
           {mode === "committee" && data.review && <CommitteeCard review={data.review} has={has} open={setModal} reload={reload} />}
           {mode === "visit" && data.visit && <VisitCard visit={data.visit} has={has} open={setModal} />}
-          {a.status === "in_progress" && data.current && <CurrentStage data={data} has={has} open={setModal} />}
           {data.deficiencies.length > 0 && <DeficiencyCard defs={data.deficiencies} canRespond={has("respond_deficiency")} open={setModal} />}
           {mode !== "visit" && data.visit && <VisitCard visit={data.visit} has={has} open={setModal} />}
           {mode !== "committee" && data.review && <CommitteeCard review={data.review} has={has} open={setModal} reload={reload} />}
           {data.undertakings.length > 0 && (
-            <Card title="Undertakings from this decision" pad={false}>
+            <Card id="undertakings" title="Undertakings from this decision" pad={false}>
               <Table>
                 <thead><tr><th>Condition</th><th>Due</th><th>State</th></tr></thead>
                 <tbody>{data.undertakings.map((u) => (
@@ -100,46 +120,20 @@ export default function CaseView({ appId, mode = "case" }: { appId: number; mode
               </Table>
             </Card>
           )}
-          <Card title="Documents" subtitle="Every upload is versioned and fingerprinted (SHA-256)">
+          <Card id="documents" title="Documents" subtitle="Every upload is versioned and fingerprinted (SHA-256)">
             <FileList files={data.files} empty="No application documents yet." />
             {has("upload_document") && (
-              <div className="mt-3 border-t border-line/70 pt-3">
+              <div className="mt-3 border-t border-line pt-3">
                 <FilePicker entityType="application" entityId={a.id} slot="supporting" label="Upload a supporting document"
                   onUploaded={() => { useApp.getState().bumpVersion(); }} />
               </div>
             )}
           </Card>
+          <Section id="timeline" title="Timeline" description="Every event on this case from the tamper-evident audit trail, newest first. The chip is the entry's hash.">
+            <div className="surface p-3"><Timeline entries={data.timeline} /></div>
+          </Section>
         </div>
-
-        <div className="space-y-5">
-          <Card title="Case facts">
-            <KeyVal items={[
-              ["Institution", a.institution], ["Region", a.region], ["Type", a.type_name], ["Route", a.route_name],
-              ["Submitted", fmtDate(a.submitted_at)],
-              ...(data.sla ? [
-                ["Age", `${data.sla.age_days} days`] as [string, ReactNode],
-                ["With AICTE / committees", `${data.sla.waiting_aicte_days} days`] as [string, ReactNode],
-                ["With institution", `${data.sla.waiting_institution_days} days`] as [string, ReactNode],
-              ] : []),
-            ]} />
-          </Card>
-          {data.alerts.length > 0 && (
-            <Card title="Alerts on this case" subtitle="Sent automatically by the alert engine">
-              <ul className="space-y-2 text-[13.5px]">
-                {data.alerts.slice(0, 6).map((al) => (
-                  <li key={al.id} className="flex gap-2">
-                    <span className="mt-0.5">{al.kind === "escalation" ? <Stamp tone="escalated" level={al.level} /> : al.kind === "overdue" ? <Stamp tone="overdue" /> : <Stamp tone="soon">Reminder</Stamp>}</span>
-                    <span className="min-w-0"><span className="block leading-snug">{al.title}</span><span className="text-[12px] text-ink-soft">{fmtDate(al.fired_at)}</span></span>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
-          <Card title="Case timeline" subtitle="From the tamper-evident audit trail">
-            <Timeline entries={data.timeline} />
-          </Card>
-        </div>
-      </div>
+      </DocLayout>
 
       <Modals kind={modal} close={close} data={data} user={user} />
       <NextStep href={user.role === "official" ? "/queue" : user.role === "committee" ? "/my-cases" : "/"} label={user.role === "official" ? "back to my queue" : user.role === "committee" ? "back to my cases" : "back to home"} />
@@ -148,47 +142,46 @@ export default function CaseView({ appId, mode = "case" }: { appId: number; mode
 }
 
 function primaryAction(d: CaseDetail, has: (x: string) => boolean, open: (m: ModalKind) => void): ReactNode {
-  if (has("respond_deficiency")) return <Button kind="primary" onClick={() => open("respond")}><Send size={16} /> Reply to deficiency</Button>;
-  if (has("record_decision")) return <Button kind="primary" onClick={() => open("decision")}><Gavel size={16} /> Record decision</Button>;
-  if (has("complete_review")) return <Button kind="primary" onClick={() => open("complete")}><CheckCircle2 size={16} /> Complete {d.current?.stage_code === "intake" ? "check" : "scrutiny"}</Button>;
-  if (has("review_report")) return <Button kind="primary" onClick={() => open("review_report")}><CheckCircle2 size={16} /> Review visit report</Button>;
-  if (has("assign_members") && d.visit?.status === "assignment_pending") return <Button kind="primary" onClick={() => open("members")}><Users size={16} /> Assign EVC members</Button>;
-  if (has("schedule_visit") && d.visit?.status === "date_pending") return <Button kind="primary" onClick={() => open("schedule")}><CalendarCheck2 size={16} /> Fix visit date</Button>;
-  if (has("respond_availability")) return <Button kind="primary" onClick={() => open("availability")}><CalendarCheck2 size={16} /> Confirm availability</Button>;
+  if (has("respond_deficiency")) return <Button kind="primary" onClick={() => open("respond")}><Send size={15} /> Reply to deficiency</Button>;
+  if (has("record_decision")) return <Button kind="primary" onClick={() => open("decision")}><Gavel size={15} /> Record decision</Button>;
+  if (has("complete_review")) return <Button kind="primary" onClick={() => open("complete")}><CheckCircle2 size={15} /> Complete {d.current?.stage_code === "intake" ? "check" : "scrutiny"}</Button>;
+  if (has("review_report")) return <Button kind="primary" onClick={() => open("review_report")}><CheckCircle2 size={15} /> Review visit report</Button>;
+  if (has("assign_members") && d.visit?.status === "assignment_pending") return <Button kind="primary" onClick={() => open("members")}><Users size={15} /> Assign EVC members</Button>;
+  if (has("schedule_visit") && d.visit?.status === "date_pending") return <Button kind="primary" onClick={() => open("schedule")}><CalendarCheck2 size={15} /> Fix visit date</Button>;
+  if (has("respond_availability")) return <Button kind="primary" onClick={() => open("availability")}><CalendarCheck2 size={15} /> Confirm availability</Button>;
   if (has("mark_conducted")) return <MarkConducted visitId={d.visit!.id} />;
-  if (has("submit_report")) return <Button kind="primary" onClick={() => open("report")}><FileSignature size={16} /> Submit visit report</Button>;
-  if (has("recommend")) return <Button kind="primary" onClick={() => open("recommend")}><PencilLine size={16} /> Record recommendation</Button>;
+  if (has("submit_report")) return <Button kind="primary" onClick={() => open("report")}><FileSignature size={15} /> Submit visit report</Button>;
+  if (has("recommend")) return <Button kind="primary" onClick={() => open("recommend")}><PencilLine size={15} /> Record recommendation</Button>;
   return null;
 }
 
 function MarkConducted({ visitId }: { visitId: number }) {
   const [busy, setBusy] = useState(false);
   return <Button kind="primary" busy={busy} onClick={async () => { setBusy(true); await act(`/api/visits/${visitId}/conducted`, {}, "Visit marked as conducted. The report is now due."); setBusy(false); }}>
-    <Check size={16} /> Mark visit conducted</Button>;
+    <Check size={15} /> Mark visit conducted</Button>;
 }
 
-/* ---------------------------------------------------------------- route progress */
-function RouteBar({ route, decided }: { route: RouteStep[]; decided: boolean }) {
+/* ---------------------------------------------------------------- route as a station line */
+function RouteLine({ route, decided }: { route: RouteStep[]; decided: boolean }) {
   return (
-    <ol className="sheet settle mb-5 flex flex-wrap items-stretch overflow-hidden p-0" aria-label="Route">
+    <ol className="surface enter mb-6 grid overflow-x-auto px-2 py-4" style={{ gridTemplateColumns: `repeat(${route.length}, minmax(130px, 1fr))` }} aria-label="Route">
       {route.map((s, i) => {
         const done = s.state === "done";
         const active = s.state === "active";
         return (
-          <li key={s.seq} className={`relative flex min-w-[150px] flex-1 items-start gap-2.5 px-4 py-3 ${i ? "border-l border-line/70" : ""} ${active ? "bg-brand-tint/50" : ""}`}>
-            <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-bold ${done ? "bg-olive text-white" : active ? "bg-brand text-white" : "border border-line bg-card text-ink-soft"}`}>
-              {done ? <Check size={14} /> : s.seq}
+          <li key={s.seq} className="relative px-2 text-center">
+            {i > 0 && <span className={`absolute right-1/2 top-[11px] h-[2px] w-full ${done || active ? "bg-brand" : "bg-line"}`} aria-hidden />}
+            <span className={`relative z-[1] mx-auto flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold ${done ? "bg-brand text-white" : active ? "bg-surface text-brand ring-2 ring-brand" : "bg-surface-2 text-ink-soft ring-1 ring-line"}`}>
+              {done ? <Check size={13} /> : s.seq}
             </span>
-            <span className="min-w-0">
-              <span className={`block text-[14px] font-semibold leading-tight ${active ? "text-brand-deep" : ""}`}>{s.name}</span>
-              <span className="block text-[12px] text-ink-soft">
-                {done && `${s.days} day(s)${s.on_time === false ? ", late" : ""}${s.institution_days ? `, ${s.institution_days} with institution` : ""}`}
-                {active && `Day ${s.days} · due ${fmtDate(s.due)}`}
-                {s.state === "pending" && (decided ? "Not needed" : "Upcoming")}
-                {s.state === "reverted" && "Sent back"}
-              </span>
-              {s.attempts > 1 && <span className="text-[11.5px] text-ochre-ink">Attempt {s.attempts}</span>}
-            </span>
+            <div className={`mt-2 text-[13px] font-medium leading-tight ${active ? "text-brand-hover" : done ? "text-ink" : "text-ink-soft"}`}>{s.name}</div>
+            <div className="mono mt-0.5 text-[11.5px] text-ink-soft">
+              {done && `${s.days}d${s.institution_days ? ` · ${s.institution_days}d inst.` : ""}${s.on_time === false ? " · late" : ""}`}
+              {active && `day ${s.days} · due ${fmtDate(s.due).slice(0, 6)}`}
+              {s.state === "pending" && (decided ? "not needed" : "upcoming")}
+              {s.state === "reverted" && "sent back"}
+            </div>
+            {s.attempts > 1 && <div className="text-[11px] text-warn-ink">attempt {s.attempts}</div>}
           </li>
         );
       })}
@@ -196,42 +189,67 @@ function RouteBar({ route, decided }: { route: RouteStep[]; decided: boolean }) 
   );
 }
 
-/* ---------------------------------------------------------------- current stage */
+/* ---------------------------------------------------------------- status */
+function DecisionBlock({ data }: { data: CaseDetail }) {
+  const a = data.application;
+  return (
+    <div className="flex items-start gap-3">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-tint text-brand"><Gavel size={17} /></span>
+      <div className="text-[13.5px]">
+        <div className="text-[15px] font-semibold">{DECISION_TEXT[a.decision ?? ""]}</div>
+        <div className="mt-0.5">{a.decision_reason}</div>
+        <div className="mt-1 text-[12.5px] text-ink-soft">Recorded by {a.decided_by_name} on <span className="mono">{fmtDate(a.decided_at)}</span>. Argus records decisions; it never makes them.</div>
+      </div>
+    </div>
+  );
+}
+
 function CurrentStage({ data, has, open }: { data: CaseDetail; has: (x: string) => boolean; open: (m: ModalKind) => void }) {
+  const today = useApp((s) => s.clock?.today);
+  const ticks = useReminderTicks();
   const cur = data.current!;
   const sla = data.sla;
   const paused = cur.paused_at != null;
+  const bar = today ? caseSla(data, today) : null;
+  const who = sla?.waiting_on === "institution" ? data.application.institution
+    : sla?.waiting_on === "committee" && data.visit ? "EVC members"
+    : sla?.waiting_on === "committee" && data.review ? "SAC/SHC members"
+    : cur.assignee ?? "Unassigned";
   return (
-    <Card title={`Now: ${STAGE_NAME[cur.stage_code] ?? cur.stage_code}`} subtitle={sla?.substatus_text}
-      action={sla && <SlaStamp status={sla.sla_status} days={sla.days_to_due} level={sla.escalation_level} waitingOn={sla.waiting_on} />}>
-      <div className="grid gap-4 md:grid-cols-3">
+    <div>
+      <div className="grid gap-4 sm:grid-cols-3">
         <div>
-          <div className="text-[12px] font-semibold uppercase tracking-wide text-ink-soft">With</div>
-          <div className="mt-0.5 text-[15px] font-medium">
-            {sla?.waiting_on === "institution" ? data.application.institution
-              : sla?.waiting_on === "committee" && data.visit ? "EVC members"
-              : sla?.waiting_on === "committee" && data.review ? "SAC/SHC members"
-              : cur.assignee ?? "Unassigned"}
-          </div>
-          <div className="text-[12.5px] text-ink-soft">{WAITING_TEXT[sla?.waiting_on ?? "aicte"]}</div>
+          <div className="text-[12px] text-ink-soft">With</div>
+          <div className="mt-1 text-[14.5px] font-medium">{sla?.waiting_on === "institution" || sla?.waiting_on === "committee" ? who : <Owner name={who} />}</div>
+          <div className="text-[12px] text-ink-soft">{WAITING_TEXT[sla?.waiting_on ?? "aicte"]}</div>
         </div>
         <div>
-          <div className="text-[12px] font-semibold uppercase tracking-wide text-ink-soft">Next due</div>
-          <div className="mt-0.5 text-[15px] font-medium">{fmtDate(sla?.due_date)}</div>
-          <div className={`text-[12.5px] ${sla && sla.days_to_due != null && sla.days_to_due < 0 ? "font-semibold text-brand" : "text-ink-soft"}`}>{dueText(sla?.days_to_due)}</div>
+          <div className="text-[12px] text-ink-soft">Next due</div>
+          <div className="mono mt-1 text-[14.5px] font-medium">{fmtDate(sla?.due_date)}</div>
+          <div className={`text-[12px] ${sla && sla.days_to_due != null && sla.days_to_due < 0 ? "font-medium text-danger-ink" : "text-ink-soft"}`}>{dueText(sla?.days_to_due)}</div>
         </div>
         <div>
-          <div className="text-[12px] font-semibold uppercase tracking-wide text-ink-soft">AICTE time limit</div>
-          {paused ? (
-            <div className="mt-0.5 flex items-center gap-1.5 text-[15px] font-medium text-ochre-ink"><Hourglass size={15} /> Paused</div>
-          ) : (
-            <div className="mt-0.5 text-[15px] font-medium">Stage due {fmtDate(cur.due_at)}</div>
-          )}
-          <div className="text-[12.5px] text-ink-soft">{paused ? "Resumes when the institution replies" : `Started ${fmtDate(cur.started_at)}`}</div>
+          <div className="text-[12px] text-ink-soft">AICTE time limit</div>
+          {paused ? <div className="mt-1 flex items-center gap-1.5 text-[14.5px] font-medium text-warn-ink"><Hourglass size={14} /> Paused</div>
+            : <div className="mono mt-1 text-[14.5px] font-medium">{fmtDate(cur.due_at)}</div>}
+          <div className="text-[12px] text-ink-soft">{paused ? "Resumes when the institution replies" : `Stage started ${fmtDate(cur.started_at)}`}</div>
         </div>
       </div>
-      {data.actions.some((x) => ["complete_review", "raise_deficiency", "reassign", "revert", "record_decision", "assign_members", "schedule_visit", "review_report", "assign_committee", "draft_letter"].includes(x)) && (
-        <div className="mt-4 flex flex-wrap gap-2 border-t border-line/70 pt-3">
+      {bar && (
+        <div className="mt-5 rounded-xl border border-line bg-surface-2 px-4 pb-3 pt-3.5">
+          <SlaBar {...bar} ticks={ticks.stage} />
+          <div className="mt-2"><SlaLegend /></div>
+        </div>
+      )}
+      {sla && (
+        <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-line pt-3 text-[12.5px]">
+          <div><dt className="text-ink-soft">Age</dt><dd className="mono font-medium">{sla.age_days} days</dd></div>
+          <div><dt className="text-ink-soft">With AICTE / committees</dt><dd className="mono font-medium">{sla.waiting_aicte_days} days</dd></div>
+          <div><dt className="text-ink-soft">With institution</dt><dd className="mono font-medium">{sla.waiting_institution_days} days</dd></div>
+        </dl>
+      )}
+      {data.actions.some((x) => ["complete_review", "raise_deficiency", "reassign", "revert", "record_decision", "assign_members", "schedule_visit", "review_report", "assign_committee"].includes(x)) && (
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-3">
           {has("complete_review") && <Button kind="primary" small onClick={() => open("complete")}><CheckCircle2 size={14} /> Complete and move on</Button>}
           {has("raise_deficiency") && <Button small onClick={() => open("deficiency")}><MessageSquareWarning size={14} /> Return with deficiency</Button>}
           {has("record_decision") && <Button kind="primary" small onClick={() => open("decision")}><Gavel size={14} /> Record decision</Button>}
@@ -243,6 +261,32 @@ function CurrentStage({ data, has, open }: { data: CaseDetail; has: (x: string) 
           {has("revert") && <Button kind="danger" small onClick={() => open("revert")}><Undo2 size={14} /> Send back</Button>}
         </div>
       )}
+    </div>
+  );
+}
+
+function EscalationCard({ data }: { data: CaseDetail }) {
+  const today = useApp((s) => s.clock?.today);
+  const rules = useEscalationRules();
+  const groups = new Map<string, CaseAlert[]>();
+  data.alerts.filter((al) => al.kind === "escalation").forEach((al) => {
+    const k = `${al.entity_type}:${al.entity_id}`;
+    groups.set(k, [...(groups.get(k) ?? []), al]);
+  });
+  return (
+    <Card id="escalation" title="Escalation" subtitle="Who was alerted at each level, and what happens next if the item stays open">
+      <div className="grid gap-5 md:grid-cols-2">
+        {[...groups.entries()].slice(0, 4).map(([k, list]) => {
+          const reached = Math.max(...list.map((l) => l.level ?? 0));
+          const first = list[0];
+          return (
+            <div key={k}>
+              <div className="mb-2 text-[12.5px] text-ink-soft">{ENTITY_TEXT[first.entity_type] ?? first.entity_type}, due <span className="mono">{fmtDate(first.due_date)}</span></div>
+              <EscalationLadder rungs={rungsFor(list, rules)} next={nextStep(first.entity_type, first.due_date, reached, rules)} today={today} />
+            </div>
+          );
+        })}
+      </div>
     </Card>
   );
 }
@@ -250,17 +294,17 @@ function CurrentStage({ data, has, open }: { data: CaseDetail; has: (x: string) 
 /* ---------------------------------------------------------------- deficiencies */
 function DeficiencyCard({ defs, canRespond, open }: { defs: Deficiency[]; canRespond: boolean; open: (m: ModalKind) => void }) {
   return (
-    <Card title="Deficiencies and replies" subtitle="Each return records who raised it, why, and the reply">
+    <Card id="deficiencies" title="Deficiencies and replies" subtitle="Each return records who raised it, why, and the reply">
       <ol className="space-y-3">
         {defs.map((d, i) => (
-          <li key={d.id} className="rounded-md border border-line bg-paper/50 p-3">
+          <li key={d.id} className="rounded-xl border border-line bg-surface-2 p-3.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="text-[13px] font-semibold">#{i + 1} · {STAGE_NAME[d.stage_code]} · raised by {d.raised_by_name} on {fmtDate(d.raised_at)}</div>
+              <div className="text-[13px] font-medium">#{i + 1} · {STAGE_NAME[d.stage_code]} <span className="font-normal text-ink-soft">· raised by {d.raised_by_name} on <span className="mono">{fmtDate(d.raised_at)}</span></span></div>
               {d.status === "open" ? (d.days_to_due < 0 ? <Stamp tone="overdue">Reply overdue</Stamp> : <Stamp tone="soon">Reply due {fmtDate(d.response_due_at)}</Stamp>) : <Stamp tone="closed">Answered</Stamp>}
             </div>
-            <p className="mt-1.5 text-[14px]"><CornerUpLeft size={14} className="mr-1 inline text-brand" />{d.reason}</p>
+            <p className="mt-1.5 text-[13.5px]"><CornerUpLeft size={14} className="mr-1 inline text-danger" />{d.reason}</p>
             {d.response_text && (
-              <div className="mt-2 border-l-2 border-olive pl-3 text-[14px]">
+              <div className="mt-2.5 border-l-2 border-brand pl-3 text-[13.5px]">
                 <div className="text-[12.5px] text-ink-soft">Reply by {d.responded_by_name} on {fmtDate(d.responded_at)}</div>
                 {d.response_text}
                 {d.files.length > 0 && <div className="mt-1"><FileList files={d.files} /></div>}
@@ -282,21 +326,21 @@ function VisitCard({ visit, has, open }: { visit: VisitDetail; has: (x: string) 
     report_submitted: "Report submitted, review pending", reviewed: "Visit complete",
   };
   return (
-    <Card title="Expert Visit Committee" subtitle={STEP[visit.status]}
+    <Card id="visit" title="Expert Visit Committee" subtitle={STEP[visit.status]}
       action={visit.status === "reviewed" ? <Stamp tone="closed">Complete</Stamp> : visit.days_to_step_due != null && visit.days_to_step_due < 0 ? <Stamp tone="overdue">Delayed</Stamp> : <Stamp tone="info">Step due {fmtDate(visit.step_due_at)}</Stamp>}>
       <div className="grid gap-4 md:grid-cols-[1fr_1fr]">
         <div>
-          <div className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-ink-soft">Members</div>
+          <div className="mb-1.5 text-[12px] font-medium text-ink-soft">Members</div>
           {visit.members.length ? (
-            <ul className="space-y-1.5 text-[14px]">
+            <ul className="space-y-1.5 text-[13.5px]">
               {visit.members.map((m) => (
                 <li key={m.user_id} className="flex items-center justify-between gap-2">
-                  <span>{m.name}{m.is_convenor && <span className="ml-1 text-[12px] text-ink-soft">(convenor)</span>}</span>
+                  <span className="flex items-center gap-2"><Owner name={m.name} />{m.is_convenor && <span className="ml-1 text-[12px] text-ink-soft">(convenor)</span>}</span>
                   {m.availability === "available" ? <Stamp tone="ok">Available</Stamp> : m.availability === "unavailable" ? <Stamp tone="overdue">Unavailable</Stamp> : <Stamp tone="waiting">Pending</Stamp>}
                 </li>
               ))}
             </ul>
-          ) : <div className="text-[14px] text-ink-soft">Not assigned yet.</div>}
+          ) : <div className="text-[13.5px] text-ink-soft">Not assigned yet.</div>}
         </div>
         <div>
           <KeyVal items={[
@@ -307,7 +351,7 @@ function VisitCard({ visit, has, open }: { visit: VisitDetail; has: (x: string) 
         </div>
       </div>
       {visit.report && (
-        <div className="mt-3 rounded-md border border-line bg-paper/50 p-3 text-[14px]">
+        <div className="mt-4 rounded-xl border border-line bg-surface-2 p-3.5 text-[13.5px]">
           <div className="mb-1 flex items-center justify-between"><b>Visit report</b><Stamp tone={visit.report.recommendation === "satisfactory" ? "ok" : "soon"}>{REPORT_OUTCOME_TEXT[visit.report.recommendation]}</Stamp></div>
           <p>{visit.report.findings}</p>
           <div className="mt-1 text-[12.5px] text-ink-soft">Submitted by {visit.report.submitted_by_name} on {fmtDate(visit.report.submitted_at)}{visit.reviewed_at && ` · reviewed by ${visit.reviewed_by_name} on ${fmtDate(visit.reviewed_at)}`}</div>
@@ -315,7 +359,7 @@ function VisitCard({ visit, has, open }: { visit: VisitDetail; has: (x: string) 
         </div>
       )}
       {(has("respond_availability") || has("submit_report") || has("mark_conducted")) && (
-        <div className="mt-3 flex flex-wrap gap-2 border-t border-line/70 pt-3">
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-3">
           {has("respond_availability") && <Button kind="primary" small onClick={() => open("availability")}><CalendarCheck2 size={14} /> Confirm availability</Button>}
           {has("mark_conducted") && <MarkConducted visitId={visit.id} />}
           {has("submit_report") && <Button kind="primary" small onClick={() => open("report")}><FileSignature size={14} /> Submit visit report</Button>}
@@ -336,17 +380,17 @@ function CommitteeCard({ review, has, open, reload }: { review: Review; has: (x:
     reload();
   };
   return (
-    <Card title="SAC/SHC review" subtitle={`Members: ${review.members.map((m) => m.name).join(", ")}`}
+    <Card id="committee" title="SAC/SHC review" subtitle={`Members: ${review.members.map((m) => m.name).join(", ")}`}
       action={review.status === "recommended" ? <Stamp tone="closed">Recommended</Stamp> : <Stamp tone="soon">Awaiting recommendation</Stamp>}>
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <span className="text-[13px] font-semibold">Electronic case summary</span>
+        <span className="text-[13px] font-medium">Electronic case summary</span>
         <DraftLabel />
         <span className="text-[12px] text-ink-soft">{review.summary_source === "llm" ? "Drafted with the AI helper" : "Built from case records (offline template)"} · {fmtDateTime(review.summary_at)}</span>
         {has("regenerate_summary") && <Button small kind="ghost" busy={busy} onClick={regen}><RefreshCw size={13} /> Redraft</Button>}
       </div>
-      <pre className="whitespace-pre-wrap rounded-md border border-line bg-[#fffdf8] p-3 font-sans text-[13.5px] leading-relaxed">{review.summary}</pre>
+      <pre className="whitespace-pre-wrap rounded-xl border border-line bg-surface-2 p-4 font-sans text-[13.5px] leading-relaxed">{review.summary}</pre>
       {review.recommendation && (
-        <div className="mt-3 rounded-md border-l-4 border-olive bg-olive-tint/50 px-3 py-2 text-[14px]">
+        <div className="mt-3 rounded-lg border-l-[3px] border-brand bg-brand-tint px-3 py-2 text-[13.5px]">
           <b>{review.recommendation_text}</b> · {review.remarks}
           <div className="text-[12.5px] text-ink-soft">Recorded by {review.recommended_by_name} on {fmtDate(review.recommended_at)}. This is advice to the competent authority, not a decision.</div>
         </div>
@@ -399,7 +443,7 @@ function SimpleRemarks({ close, title, path, help, success }: MP & { title: stri
   return (
     <Modal title={title} onClose={close} footer={<><Button onClick={close}>Cancel</Button><Button kind="primary" busy={busy} onClick={() => run(path, { remarks }, success)}>Confirm</Button></>}>
       <p className="text-[14px] text-ink-soft">{help}</p>
-      <Field label="Remarks (optional)"><textarea className="input" value={remarks} onChange={(e) => setRemarks(e.target.value)} /></Field>
+      <Field label="Remarks (optional)"><textarea className="field" value={remarks} onChange={(e) => setRemarks(e.target.value)} /></Field>
     </Modal>
   );
 }
@@ -421,12 +465,12 @@ function DeficiencyModal({ close, data }: MP) {
       footer={<><Button onClick={close}>Cancel</Button><Button kind="primary" busy={busy} disabled={reason.trim().length < 10}
         onClick={() => run(`/api/applications/${data.application.id}/deficiency`, { reason, response_days: days }, "Returned to the institution. The AICTE time limit is paused.")}>Return to institution</Button></>}>
       <Field label="Reason (required)" hint="Say exactly what is missing or wrong, so the institution can fix it in one go. At least 10 characters.">
-        <textarea className="input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Faculty list is short of the required cadre ratio. Upload revised faculty details." />
+        <textarea className="field" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Faculty list is short of the required cadre ratio. Upload revised faculty details." />
       </Field>
       <Field label="Days the institution has to reply" hint="Default comes from the Rules page (illustrative).">
         <input type="number" min={1} max={60} className="input max-w-[120px]" value={days} onChange={(e) => setDays(Number(e.target.value))} />
       </Field>
-      <div className="rounded-md border border-line bg-paper/50 p-3">
+      <div className="rounded-xl border border-line bg-surface-2 p-3">
         <div className="mb-2 flex items-center justify-between gap-2">
           <span className="text-[13px] font-semibold">Deficiency letter</span>
           <Button small kind="ghost" busy={drafting} onClick={makeDraft}><Sparkles size={13} /> Draft letter</Button>
@@ -452,7 +496,7 @@ function RespondModal({ close, data }: MP) {
       footer={<><Button onClick={close}>Cancel</Button><Button kind="primary" busy={busy} disabled={text.trim().length < 10}
         onClick={() => run(`/api/applications/${data.application.id}/respond`, { deficiency_id: d.id, response: text, file_ids: files }, "Reply sent. The case is back with the officer for re-scrutiny.")}>Send reply</Button></>}>
       <div className="rounded-md border-l-4 border-brand bg-brand-tint/40 px-3 py-2 text-[14px]">{d.reason}<div className="text-[12.5px] text-ink-soft">Reply due {fmtDate(d.response_due_at)} ({dueText(d.days_to_due)})</div></div>
-      <Field label="Your reply"><textarea className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="Explain what you have corrected and what you are uploading." /></Field>
+      <Field label="Your reply"><textarea className="field" value={text} onChange={(e) => setText(e.target.value)} placeholder="Explain what you have corrected and what you are uploading." /></Field>
       <FilePicker entityType="deficiency" entityId={d.id} slot="reply" label="Attach supporting document" onUploaded={(f) => setFiles((x) => [...x, f.id])} />
     </Modal>
   );
@@ -489,8 +533,8 @@ function RevertModal({ close, data }: MP) {
   return (
     <Modal title="Send the case back" onClose={close}
       footer={<><Button onClick={close}>Cancel</Button><Button kind="danger" busy={busy} disabled={reason.trim().length < 10 || !to} onClick={() => run(`/api/applications/${data.application.id}/revert`, { to_stage: to, reason }, "Case sent back.")}>Send back</Button></>}>
-      <Field label="Back to"><select className="input" value={to} onChange={(e) => setTo(e.target.value)}>{targets.map((t) => <option key={t} value={t}>{STAGE_NAME[t]}</option>)}</select></Field>
-      <Field label="Reason (required)"><textarea className="input" value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+      <Field label="Back to"><select className="field" value={to} onChange={(e) => setTo(e.target.value)}>{targets.map((t) => <option key={t} value={t}>{STAGE_NAME[t]}</option>)}</select></Field>
+      <Field label="Reason (required)"><textarea className="field" value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
     </Modal>
   );
 }
@@ -508,7 +552,7 @@ function DecisionModal({ close, data, user }: MP) {
       footer={<><Button onClick={close}>Cancel</Button><Button kind="primary" busy={busy} disabled={!valid}
         onClick={() => run(`/api/applications/${data.application.id}/decision`, { outcome, reason, undertakings: outcome === "approved_with_undertakings" ? unds : [] }, "Decision recorded and audited.")}>
         <Gavel size={14} /> Record decision as {user.name}</Button></>}>
-      <div className="rounded-md bg-paper-2/60 px-3 py-2 text-[13px]">Argus does not decide. You are recording the decision of the competent authority; it is logged with your name, the time and the reason.{rec && <> Committee recommendation on file: <b>{rec}</b>.</>}</div>
+      <div className="rounded-lg bg-brand-tint px-3 py-2 text-[13px] text-ink">Argus does not decide. You are recording the decision of the competent authority; it is logged with your name, the time and the reason.{rec && <> Committee recommendation on file: <b>{rec}</b>.</>}</div>
       <Field label="Outcome">
         <div className="grid gap-1.5 sm:grid-cols-3">
           {Object.entries(DECISION_TEXT).map(([k, v]) => (
@@ -518,15 +562,15 @@ function DecisionModal({ close, data, user }: MP) {
           ))}
         </div>
       </Field>
-      <Field label="Reason (required)"><textarea className="input" value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+      <Field label="Reason (required)"><textarea className="field" value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
       {outcome === "approved_with_undertakings" && (
         <div>
           <div className="mb-1 text-[13px] font-semibold">Undertakings (time-bound conditions)</div>
           <div className="space-y-2">
             {unds.map((u, i) => (
               <div key={i} className="grid gap-2 sm:grid-cols-[1fr_150px_auto]">
-                <input className="input" placeholder="Condition the institution must meet" value={u.condition} onChange={(e) => setUnds(unds.map((x, j) => j === i ? { ...x, condition: e.target.value } : x))} />
-                <input type="date" className="input" value={u.due_date} min={addDays(today, 1)} onChange={(e) => setUnds(unds.map((x, j) => j === i ? { ...x, due_date: e.target.value } : x))} />
+                <input className="field" placeholder="Condition the institution must meet" value={u.condition} onChange={(e) => setUnds(unds.map((x, j) => j === i ? { ...x, condition: e.target.value } : x))} />
+                <input type="date" className="field" value={u.due_date} min={addDays(today, 1)} onChange={(e) => setUnds(unds.map((x, j) => j === i ? { ...x, due_date: e.target.value } : x))} />
                 <Button small onClick={() => setUnds(unds.filter((_, j) => j !== i))} disabled={unds.length === 1}>Remove</Button>
               </div>
             ))}
@@ -631,9 +675,9 @@ function ReportModal({ close, data }: MP) {
     <Modal wide title="Submit the visit report" onClose={close}
       footer={<><Button onClick={close}>Cancel</Button><Button kind="primary" busy={busy} disabled={findings.trim().length < 20}
         onClick={() => run(`/api/visits/${data.visit!.id}/report`, { findings, recommendation: rec, file_id: fileId }, "Report submitted for the officer's review.")}>Submit report</Button></>}>
-      <Field label="Findings" hint="At least 20 characters. Record what the committee observed."><textarea className="input" value={findings} onChange={(e) => setFindings(e.target.value)} /></Field>
+      <Field label="Findings" hint="At least 20 characters. Record what the committee observed."><textarea className="field" value={findings} onChange={(e) => setFindings(e.target.value)} /></Field>
       <Field label="Overall finding">
-        <select className="input" value={rec} onChange={(e) => setRec(e.target.value)}>{Object.entries(REPORT_OUTCOME_TEXT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+        <select className="field" value={rec} onChange={(e) => setRec(e.target.value)}>{Object.entries(REPORT_OUTCOME_TEXT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
       </Field>
       <FilePicker entityType="evc_visit" entityId={data.visit!.id} slot="visit_report" label="Attach signed report" onUploaded={(f) => setFileId(f.id)} />
     </Modal>
@@ -648,7 +692,7 @@ function RecommendModal({ close, data }: MP) {
     <Modal wide title="Record the committee's recommendation" onClose={close}
       footer={<><Button onClick={close}>Cancel</Button><Button kind="primary" busy={busy} disabled={remarks.trim().length < 10}
         onClick={() => run(`/api/reviews/${data.review!.id}/recommend`, { recommendation: rec, remarks }, "Recommendation recorded. The case moves to the competent authority.")}>Record recommendation</Button></>}>
-      <p className="rounded-md bg-paper-2/60 px-3 py-2 text-[13px]">A recommendation is advice to the competent authority. The decision is recorded separately by the authority.</p>
+      <p className="rounded-lg bg-brand-tint px-3 py-2 text-[13px] text-ink">A recommendation is advice to the competent authority. The decision is recorded separately by the authority.</p>
       <div className="space-y-1.5">
         {Object.entries(RECOMMENDATION_TEXT).map(([k, v]) => (
           <label key={k} className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-[14px] ${rec === k ? "border-brand bg-brand-tint/50" : "border-line"}`}>
@@ -656,7 +700,7 @@ function RecommendModal({ close, data }: MP) {
           </label>
         ))}
       </div>
-      <Field label="Remarks (required)"><textarea className="input" value={remarks} onChange={(e) => setRemarks(e.target.value)} /></Field>
+      <Field label="Remarks (required)"><textarea className="field" value={remarks} onChange={(e) => setRemarks(e.target.value)} /></Field>
     </Modal>
   );
 }

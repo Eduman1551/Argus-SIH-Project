@@ -78,9 +78,9 @@ def case_detail(conn: Conn, now: datetime, user: dict, app_id: int) -> dict:
 
     unds = [u for u in reports.undertakings(conn, now, institution_id=a["institution_id"]) if u["application_id"] == app_id]
     timeline = conn.all(
-        """SELECT id, at, actor_label, actor_id, action, entity_type, entity_id, details FROM audit_log
+        """SELECT id, at, actor_label, actor_id, action, entity_type, entity_id, details, hash FROM audit_log
            WHERE application_id = %s ORDER BY id""", (app_id,))
-    alerts = conn.all("""SELECT id, kind, level, title, trigger_date, fired_at, entity_type FROM alerts
+    alerts = conn.all("""SELECT id, kind, level, title, trigger_date, fired_at, entity_type, entity_id, due_date FROM alerts
                          WHERE application_id = %s ORDER BY id DESC LIMIT 50""", (app_id,))
 
     return {
