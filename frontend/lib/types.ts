@@ -8,6 +8,7 @@ export interface PendencyRow {
   waiting_institution_days: number; waiting_aicte_days: number; due_date: string | null; days_to_due: number | null;
   waiting_on: "institution" | "aicte" | "committee"; sla_status: "on_track" | "due_soon" | "overdue";
   escalation_level: number | null;
+  stage_due: string; stage_paused_days: number; stage_paused_now: boolean; stage_open_pause_days: number;
 }
 
 export interface OfficialDashboard {

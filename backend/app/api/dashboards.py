@@ -89,6 +89,9 @@ def institution_home(conn: Conn, now: datetime, institution_id: int) -> dict:
         a["substatus_text"] = p["substatus_text"] if p else "Decided"
         a["due_date"] = p["due_date"] if p else None
         a["waiting_on"] = p["waiting_on"] if p else None
+        for k in ("days_to_due", "stage_started", "stage_due", "days_in_stage", "stage_paused_days", "stage_paused_now",
+                  "stage_open_pause_days"):
+            a[k] = p[k] if p else None
     deficiencies = conn.all(
         """SELECT d.id, d.application_id, a.ref_no, d.reason, d.raised_at, d.response_due_at, u.name AS raised_by
            FROM deficiencies d JOIN applications a ON a.id = d.application_id JOIN users u ON u.id = d.raised_by

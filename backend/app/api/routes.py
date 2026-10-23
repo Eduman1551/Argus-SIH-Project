@@ -212,9 +212,13 @@ def list_applications(request: Request, status: str | None = None, region_id: in
         for r in rows:
             p = pend.get(r["id"])
             r.update({k: p[k] for k in ("sla_status", "substatus_text", "due_date", "days_to_due", "age_days",
-                                        "waiting_on", "escalation_level", "assignee")} if p else
+                                        "waiting_on", "escalation_level", "assignee", "substatus", "stage_started",
+                                        "stage_due", "days_in_stage", "stage_paused_days", "stage_paused_now",
+                                        "stage_open_pause_days")} if p else
                      {"sla_status": "decided", "substatus_text": "Decided", "due_date": None, "days_to_due": None,
-                      "age_days": None, "waiting_on": None, "escalation_level": None, "assignee": None})
+                      "age_days": None, "waiting_on": None, "escalation_level": None, "assignee": None,
+                      "substatus": None, "stage_started": None, "stage_due": None, "days_in_stage": None,
+                      "stage_paused_days": None, "stage_paused_now": None, "stage_open_pause_days": None})
             if sla and r["sla_status"] != sla:
                 continue
             out.append(r)

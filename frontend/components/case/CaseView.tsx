@@ -12,6 +12,7 @@ import { addDays, dueText, fmtDate, fmtDateTime } from "@/lib/format";
 import { DECISION_TEXT, RECOMMENDATION_TEXT, REPORT_OUTCOME_TEXT, STAGE_NAME, WAITING_TEXT } from "@/lib/labels";
 import { useApp, type SessionUser } from "@/lib/store";
 import type { Member, PendencyRow, Undertaking } from "@/lib/types";
+import { rowSla } from "@/components/viz/SlaBar";
 
 /* ---------------------------------------------------------------- payload */
 interface RouteStep { seq: number; code: string; name: string; state: string; attempts: number; assignee: string | null;
@@ -41,7 +42,12 @@ export interface CaseDetail {
     sac_members?: { id: number; name: string; designation: string }[]; revert_targets?: string[] };
 }
 
-type ModalKind = null | "complete" | "deficiency" | "reassign" | "revert" | "decision" | "members" | "schedule" | "review_report"
+/** SLA bar props for the case's current stage (same window as the case lists show). */
+export function caseSla(d: CaseDetail, today: string) {
+  return d.sla && d.application.status === "in_progress" ? rowSla(d.sla, today) : null;
+}
+
+type ModalKind =null | "complete" | "deficiency" | "reassign" | "revert" | "decision" | "members" | "schedule" | "review_report"
   | "respond" | "committee" | "availability" | "report" | "recommend";
 
 /* ---------------------------------------------------------------- page */

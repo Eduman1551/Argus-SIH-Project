@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Fragment, useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import {
   AlertTriangle, ArrowRight, Check, ChevronDown, ChevronRight, CircleAlert, Flag, Hourglass, Info, Lightbulb, X,
 } from "lucide-react";
@@ -517,13 +517,14 @@ export function DraftLabel() {
 /** Segmented tabs with a sliding indicator. */
 export function Tabs({ tabs, value, onChange }: { tabs: { id: string; label: ReactNode }[]; value: string; onChange: (id: string) => void }) {
   const reduce = useReducedMotion();
+  const uid = useId();
   return (
     <div role="tablist" className="mb-4 inline-flex max-w-full flex-wrap gap-0.5 rounded-xl border border-line bg-surface-2 p-1">
       {tabs.map((t) => (
         <button key={t.id} role="tab" aria-selected={value === t.id} onClick={() => onChange(t.id)}
           className={`relative rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${value === t.id ? "text-ink" : "text-ink-soft hover:text-ink"}`}>
           {value === t.id && (
-            <motion.span layoutId="tab-indicator" className="absolute inset-0 rounded-lg bg-surface shadow-sm ring-1 ring-line"
+            <motion.span layoutId={`tab-${uid}`} className="absolute inset-0 rounded-lg bg-surface shadow-sm ring-1 ring-line"
               transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 500, damping: 38 }} />
           )}
           <span className="relative">{t.label}</span>

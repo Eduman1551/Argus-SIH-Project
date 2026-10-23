@@ -53,7 +53,8 @@ def pendency(conn: Conn, now: datetime, region_id: int | None = None, institutio
         """SELECT a.id, a.ref_no, a.app_type, t.name AS type_name, ro.name AS route_name, a.submitted_at,
                   a.academic_year, a.programme, i.id AS institution_id, i.name AS institution, r.id AS region_id,
                   r.name AS region, s.id AS stage_id, s.stage_code, st.name AS stage_name, s.substatus,
-                  s.started_at, s.due_at, s.paused_at, s.assigned_to, u.name AS assignee,
+                  s.started_at, s.due_at, s.paused_at, s.paused_seconds AS stage_paused_secs, s.assigned_to,
+                  u.name AS assignee,
                   (SELECT COALESCE(sum(x.paused_seconds), 0) FROM application_stages x
                     WHERE x.application_id = a.id) AS paused_secs,
                   d.response_due_at, v.step_due_at, v.visit_date,
@@ -100,6 +101,13 @@ def pendency(conn: Conn, now: datetime, region_id: int | None = None, institutio
             "waiting_institution_days": inst_days, "waiting_aicte_days": max(age - inst_days, 0),
             "due_date": due, "days_to_due": (due - today).days if due else None,
             "waiting_on": waiting_on, "sla_status": status, "escalation_level": a["escalation_level"],
+            # read-only detail for the SLA bar: the current stage's own window and its institution time
+            "stage_due": ist_date(a["due_at"]),
+            "stage_paused_days": round((a["stage_paused_secs"] + (int((now - a["paused_at"]).total_seconds())
+                                                                  if a["paused_at"] else 0)) / 86400),
+            "stage_paused_now": a["paused_at"] is not None,
+            # an open pause extends the stage due date only when the institution replies
+            "stage_open_pause_days": (today - ist_date(a["paused_at"])).days if a["paused_at"] else 0,
         })
     return out
 
