@@ -20,6 +20,12 @@ function step(label, cmd, args, opts = {}) {
   }
 }
 
+const [major, minor] = process.versions.node.split(".").map(Number);
+if (major < 20 || (major === 20 && minor < 9)) {
+  console.error(`Node ${process.versions.node} is too old. Install the version in .nvmrc: nvm install 22.23.4 && nvm use 22.23.4`);
+  process.exit(1);
+}
+
 const venvPython = isWin ? path.join(root, ".venv", "Scripts", "python.exe") : path.join(root, ".venv", "bin", "python");
 if (!existsSync(venvPython)) {
   step("Create Python virtualenv", isWin ? "py" : "python3", isWin ? ["-3", "-m", "venv", ".venv"] : ["-m", "venv", ".venv"]);

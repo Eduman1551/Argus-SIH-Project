@@ -3,6 +3,9 @@
   "private": true,
   "description": "Argus: AICTE approval workflow, compliance monitoring and alert management prototype (SIH 2026, PS26262)",
   "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=20.9"
+  },
   "scripts": {
     "setup": "node scripts/setup.mjs",
     "db:local": "node scripts/local-db.mjs",

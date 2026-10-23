@@ -49,7 +49,17 @@ Details: [docs/DETAILS.md](docs/DETAILS.md).
 
 ## Run it on Windows
 
-Needs Python 3.11 to 3.13, Node 20+, pnpm and PostgreSQL 14+.
+Needs Python 3.11 to 3.13, Node 20.9+ (tested on 22.23.4, see `.nvmrc`), pnpm 11 and PostgreSQL 14+.
+
+Install Node with [nvm for Windows](https://github.com/coreybutler/nvm-windows), then pnpm into that Node:
+
+```powershell
+nvm install 22.23.4
+nvm use 22.23.4             # once, from an admin terminal if nvm asks
+npm install -g pnpm@11.9.0
+```
+
+Then:
 
 ```powershell
 copy .env.example .env      # copy, do not rename; then set DATABASE_URL (GROQ_API_KEY is optional)
