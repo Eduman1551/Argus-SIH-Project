@@ -1,5 +1,8 @@
 # Argus demo script (4 to 5 minutes)
 
+Start the app with `pnpm dev` and open **http://localhost:3001** (the API answers on
+http://localhost:8001/api/health; both ports can be changed with `WEB_PORT` / `API_PORT` in `.env`).
+
 Everything below uses the scripted cases in the synthetic dataset, so it works the same every time.
 Before you start, press the **Reset** button (↺ next to the clock) so the simulated date is
 **Fri, 15 May 2026**. Switch users with the person menu at the top right.

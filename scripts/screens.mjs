@@ -5,9 +5,10 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { webUrl } from "./ports.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const base = process.env.ARGUS_URL ?? "http://localhost:3000";
+const base = webUrl(); // http://localhost:WEB_PORT (default 3001), or ARGUS_URL
 const [code = "off-NR-1", ...paths] = process.argv.slice(2);
 const sizes = (process.env.SIZES ?? "1366x768,1920x1080").split(",").map((s) => s.split("x").map(Number));
 const fullPage = process.env.FULL !== "0";

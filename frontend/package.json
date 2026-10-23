@@ -3,9 +3,9 @@
   "private": true,
   "packageManager": "pnpm@11.9.0",
   "scripts": {
-    "dev": "next dev --port 3000",
+    "dev": "node ../scripts/dev.mjs web",
     "build": "next build",
-    "start": "next start --port 3000",
+    "start": "node ../scripts/dev.mjs web:start",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { webUrl } from "./ports.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const isWin = process.platform === "win32";
@@ -39,4 +40,4 @@ if (!existsSync(path.join(root, ".env")) && !process.env.DATABASE_URL) {
 }
 step("Create database tables", venvPython, ["scripts/db.py", "init"], { shell: false });
 step("Load synthetic data", venvPython, ["scripts/db.py", "seed"], { shell: false });
-console.log("\nSetup done. Start the app with `pnpm dev` and open http://localhost:3000");
+console.log(`\nSetup done. Start the app with \`pnpm dev\` and open ${webUrl()}`);

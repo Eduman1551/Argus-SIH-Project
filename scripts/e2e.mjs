@@ -1,8 +1,9 @@
 // Clicks through the main demo path in the real UI as each role and fails on console errors.
 // Needs `pnpm dev` running. Resets the demo data first. Usage: pnpm e2e
 import { chromium } from "playwright";
+import { webUrl } from "./ports.mjs";
 
-const base = process.env.ARGUS_URL ?? "http://localhost:3000";
+const base = webUrl(); // http://localhost:WEB_PORT (default 3001), or ARGUS_URL
 const channel = process.env.PW_CHANNEL ?? "msedge";
 const browser = await chromium.launch(channel === "chromium" ? {} : { channel });
 const context = await browser.newContext({ viewport: { width: 1366, height: 768 } });

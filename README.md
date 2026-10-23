@@ -64,11 +64,15 @@ Then:
 ```powershell
 copy .env.example .env      # copy, do not rename; then set DATABASE_URL (GROQ_API_KEY is optional)
 pnpm run setup              # venv + packages, frontend packages, tables, synthetic data
-pnpm dev:clean              # free ports 3000 and 8000 if an old Argus dev server still holds them
-pnpm dev                    # API on :8000, web on :3000
+pnpm dev                    # checks the ports, then API on :8001 and web on :3001
 ```
 
-Open http://localhost:3000 and pick a demo user. `pnpm run setup` must be written with `run`,
+Open http://localhost:3001 and pick a demo user (API health: http://localhost:8001/api/health).
+
+Argus uses its own ports, 8001 (API) and 3001 (web), so it can run next to other projects on
+8000/3000. Change them with `API_PORT` / `WEB_PORT` in `.env`; the web proxy follows `API_PORT`.
+If a port is busy, `pnpm dev` stops and says which process holds it. `pnpm dev:clean` stops only
+Argus dev servers on those two ports and never touches other programs. `pnpm run setup` must be written with `run`,
 because `pnpm setup` is a built-in pnpm command. Setup is safe to repeat.
 
 Works with Neon: use the pooled connection string with `sslmode=require`. Over the internet each query

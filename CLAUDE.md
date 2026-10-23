@@ -162,7 +162,7 @@ Include **scripted demo cases** (named in the data generator) that make `docs/DE
 | Scheduling of alerts | The idempotent alert tick from section 3. Optional Vercel Cron on `/api/cron/tick`. No threads, no APScheduler. |
 | LLM (optional) | **Groq** (free tier) via the `groq` SDK behind a thin interface, for drafting case summaries and deficiency / reminder letters (clearly labelled "Draft, to be reviewed by the officer"). `GROQ_API_KEY` and `LLM_MODEL` from env. **Do not use the Anthropic API or any paid LLM API.** Offline template fallback is mandatory. |
 | Frontend | **Next.js (App Router) + React + TypeScript**, Tailwind CSS, lucide-react, Zustand, Recharts for charts. Client components talk to the backend through relative `/api/...` paths (one Vercel project, no CORS). No business logic in Next API routes. |
-| Tooling | **pnpm** (not npm/yarn), **tsx** for TS scripts (not ts-node), pytest, ruff, `concurrently` for `pnpm dev` (API on 8000, web on 3000) |
+| Tooling | **pnpm** (not npm/yarn), **tsx** for TS scripts (not ts-node), pytest, ruff, `concurrently` for `pnpm dev` (API on 8001, web on 3001; configurable via `API_PORT` / `WEB_PORT`, because another project uses 8000/3000) |
 
 **Deploy as one Vercel project:** the Next.js app plus the FastAPI app as a Python function under `/api` (an `api/index.py` entrypoint and a `vercel.json`). Keep the Python bundle lean (no heavy libraries are needed here). Keep local development working with `pnpm dev`. Environment variables are set in Vercel settings only. Never commit `.env`.
 
