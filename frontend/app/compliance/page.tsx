@@ -26,21 +26,19 @@ export default function CompliancePage() {
 
   return (
     <div>
-      <PageHeader crumbs={[{ label: "Monitoring" }, { label: "Compliance" }]} title="Undertakings and compliance" description="Time-bound conditions attached to approvals: what is due, what is overdue, and evidence waiting for you to verify."
+      <PageHeader crumbs={[{ label: "Monitoring" }, { label: "Compliance" }]} title="Compliance" description="Undertakings from approvals, and evidence waiting for you to check."
         action={user.official_kind === "regional" ? (
           <Tabs className="" value={all ? "all" : "mine"} onChange={(v) => setAll(v === "all")}
             tabs={[{ id: "mine", label: "My Region" }, { id: "all", label: "All Regions" }]} />) : undefined} />
-      <HelpBox id="compliance">Verify evidence from the first tab. If it is incomplete, ask the institution to resubmit with a reason. Undertakings that pass their due date are flagged and escalated automatically.</HelpBox>
+      <HelpBox id="compliance">Check the evidence in the first tab. If something is missing, send it back with a reason.</HelpBox>
       <Metrics>
         <Stat label="Waiting for you" value={waiting.length} tone={waiting.length ? "warn" : "good"} hint="Evidence to verify" />
         <Stat label="Overdue" value={count("overdue")} tone={count("overdue") ? "red" : "good"} hint="Past the due date" />
         <Stat label="Due soon" value={count("due_soon")} tone={count("due_soon") ? "warn" : "ink"} hint="Reminders going out" />
-        <Stat label="Open" value={count("open")} hint="Not due yet" />
-        <Stat label="Closed" value={count("closed")} tone="good" hint="Verified and closed" />
       </Metrics>
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: "verify", label: `Verification queue (${waiting.length})` }, { id: "all", label: `All undertakings (${rows.length})` }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: "verify", label: `To verify (${waiting.length})` }, { id: "all", label: `All undertakings (${rows.length})` }]} />
       {tab === "verify" ? (
-        <Card title="Evidence waiting for verification" pad={false}>
+        <Card title="Evidence to verify" pad={false}>
           {waiting.length ? (
             <Table minWidth={900}>
               <thead><tr><th>Institution</th><th>Condition</th><th>Due</th><th>Evidence</th><th>Decision</th></tr></thead>
@@ -69,13 +67,12 @@ export default function CompliancePage() {
             <option value="open">Open</option><option value="awaiting_verification">Awaiting verification</option><option value="closed">Closed</option>
           </select>}>
           <Table minWidth={860}>
-            <thead><tr><th>Institution</th><th>Condition</th><th>Case</th><th>Due</th><th>State</th></tr></thead>
+            <thead><tr><th>Institution</th><th>Condition</th><th>Due</th><th>State</th></tr></thead>
             <tbody>
               {shown.map((u) => (
                 <tr key={u.id}>
                   <td>{u.institution}<div className="text-[12.5px] text-ink-soft">{u.region}</div></td>
-                  <td className="max-w-[320px]">{u.condition_text}</td>
-                  <td><Link href={`/applications/${u.application_id}`} className="mono no-underline">{u.ref_no}</Link></td>
+                  <td className="max-w-[360px]">{u.condition_text}<div><Link href={`/applications/${u.application_id}`} className="mono text-[11.5px] no-underline">{u.ref_no}</Link></div></td>
                   <td><DueCell date={u.due_date} days={u.state === "closed" ? null : u.days_to_due} fmt={fmtDate} /></td>
                   <td><UndertakingState u={u} /></td>
                 </tr>
@@ -84,7 +81,7 @@ export default function CompliancePage() {
           </Table>
         </Card>
       )}
-      <NextStep href="/validity" label="document validity board" />
+      <NextStep href="/validity" label="document validity" />
     </div>
   );
 }

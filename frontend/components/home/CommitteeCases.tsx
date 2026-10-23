@@ -6,7 +6,7 @@ import { useCallback } from "react";
 import { CalendarCheck2, FileSignature, PencilLine } from "lucide-react";
 import { VisitStamp } from "@/components/status";
 import {
-  Avatar, Card, DueCell, Empty, ErrorNote, HelpBox, Metrics, NextStep, PageHeader, PageSkeleton, Stamp, Stat, Table, useRowNav,
+  Card, DueCell, Empty, ErrorNote, HelpBox, Metrics, NextStep, PageHeader, PageSkeleton, Stamp, Stat, Table, useRowNav,
 } from "@/components/ui";
 import { useApi } from "@/lib/api";
 import { dueText, fmtDate } from "@/lib/format";
@@ -45,10 +45,9 @@ export default function CommitteeCases() {
   return (
     <div>
       <PageHeader crumbs={[{ label: user.committee_kind === "SAC" ? "SAC/SHC member" : "Expert Visit Committee" }, { label: "My cases" }]} title="My cases"
-        description="Only the visits and reviews assigned to you. Each row says what is waiting on you." />
+        description="Visits and reviews assigned to you." />
       <HelpBox id="committee">
-        Open a visit to confirm your available dates, mark the visit as conducted and submit the report. Open a SAC/SHC case to read the
-        case summary and record the committee&apos;s recommendation. Your recommendation is advice to the competent authority, not a decision.
+        Start with <b>What needs you</b>. Your recommendation is advice to the authority, not a decision.
       </HelpBox>
       <Metrics>
         <Stat label="Waiting on you" value={data.counts.actions} tone={data.counts.actions ? "warn" : "good"} hint="Steps that need your input" />
@@ -77,21 +76,17 @@ export default function CommitteeCases() {
       </Card>
 
       {user.committee_kind !== "SAC" || visits.length > 0 ? (
-        <Card title="Expert visits" subtitle="Visits you are a member of. Click a row to open it." pad={false} className="mb-6">
+        <Card title="Expert visits" subtitle="Click a row to open it" pad={false} className="mb-6">
           {visits.length ? (
             <Table minWidth={860}>
-              <thead><tr><th>Case</th><th>Current step</th><th>Visit date</th><th>Step due</th><th>Your part</th><th>Status</th></tr></thead>
+              <thead><tr><th>Case</th><th>Step</th><th>Visit date</th><th>Due</th><th>Status</th></tr></thead>
               <tbody>
                 {visits.map((v, i) => (
                   <tr key={v.id} {...visitRow(i)} aria-label={`Open visit for ${v.ref_no}`}>
                     <td><span className="mono font-medium text-brand">{v.ref_no}</span><div className="text-[12px] text-ink-soft">{v.institution}, {v.city}</div></td>
-                    <td>{v.step}</td>
+                    <td>{v.step}{v.my_action && <div className="text-[12px] font-medium text-brand">{v.my_action}</div>}</td>
                     <td className="mono">{v.visit_date ? fmtDate(v.visit_date) : "–"}</td>
                     <td><DueCell date={v.step_due_at} days={v.days_to_due} fmt={fmtDate} /></td>
-                    <td>
-                      <div className="flex items-center gap-1.5 text-[12.5px]"><Avatar name={user.name} size={18} />{v.i_am_convenor ? "Convenor" : "Member"}</div>
-                      {v.my_action ? <span className="text-[12.5px] font-medium text-brand">{v.my_action}</span> : <span className="text-[12.5px] text-ink-soft">Nothing due</span>}
-                    </td>
                     <td><VisitStamp v={v} /></td>
                   </tr>
                 ))}
@@ -102,7 +97,7 @@ export default function CommitteeCases() {
       ) : null}
 
       {user.committee_kind !== "EVC" || reviews.length > 0 ? (
-        <Card title="SAC/SHC reviews" subtitle="Cases placed before you. Click a row to open it." pad={false}>
+        <Card title="SAC/SHC reviews" subtitle="Click a row to open it" pad={false}>
           {reviews.length ? (
             <Table>
               <thead><tr><th>Case</th><th>Type</th><th>Due</th><th>Status</th></tr></thead>

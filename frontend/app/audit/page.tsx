@@ -50,9 +50,9 @@ export default function AuditPage() {
 
   return (
     <div>
-      <PageHeader crumbs={[{ label: "Insight" }, { label: "Audit trail" }]} title="Audit trail" description="Every action, alert, submission, verification and escalation, in order. Entries cannot be edited, and each one is chained to the one before it."
+      <PageHeader crumbs={[{ label: "Reports" }, { label: "Audit trail" }]} title="Audit trail" description="Who did what, and when. Entries cannot be changed."
         action={<Button kind="primary" busy={verifying} onClick={runVerify}><ShieldCheck size={15} /> Verify audit chain</Button>} />
-      <HelpBox id="audit">Press <b>Verify audit chain</b> to recompute every fingerprint from the first entry. If anyone changed or deleted a past entry in the database, the check shows exactly where the chain breaks.</HelpBox>
+      <HelpBox id="audit"><b>Verify audit chain</b> checks that no past entry was changed or deleted.</HelpBox>
       {verify && (
         <div role="status" className={`enter mb-6 flex items-start gap-3 rounded-2xl border px-4 py-3.5 ${verify.valid ? "border-brand/25 bg-brand-tint" : "border-danger/30 bg-danger-tint"}`}>
           <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white ${verify.valid ? "bg-brand" : "bg-danger"}`}>
@@ -75,19 +75,17 @@ export default function AuditPage() {
         <span className="mono ml-auto text-[12.5px] text-ink-soft">{data ? `${data.total} entries` : ""}</span>
       </div>
       {loading ? <PageSkeleton /> : error ? <ErrorNote error={error} onRetry={reload} /> : (
-        <Card pad={false} title="Entries" subtitle="Newest first. Click a row to see its details and how it links to the entry before it.">
-          <Table minWidth={980}>
-            <thead><tr><th className="num">#</th><th>When (simulated)</th><th>Who</th><th>What</th><th>Case</th><th>Fingerprint</th></tr></thead>
+        <Card pad={false} title="Entries" subtitle="Newest first. Click a row for details.">
+          <Table minWidth={760}>
+            <thead><tr><th>When</th><th>Who</th><th>What</th><th>Case</th></tr></thead>
             <tbody>
               {rows.map((e, i) => (
                 <tr key={e.id} {...rowProps(i)} className={`is-link ${open === e.id ? "is-active" : ""}`} aria-label={`Details of entry ${e.id}`}>
-                  <td className="num mono text-ink-soft">{e.id}</td>
                   <td className="mono whitespace-nowrap text-[12.5px]">{fmtDateTime(e.at)}</td>
                   <td className="max-w-[280px] text-[13px]"><div className="flex min-w-0 items-center gap-2">{e.actor_id ? <Avatar name={e.actor_label} /> : <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-surface-2 text-ink-soft ring-1 ring-inset ring-line"><Bot size={12} /></span>}
                     <div className="min-w-0">{e.actor_id ? <><div className="truncate">{e.actor_label.split(" (")[0]}</div>{e.actor_label.includes(" (") && <div className="truncate text-[11.5px] text-ink-soft">{e.actor_label.slice(e.actor_label.indexOf(" (") + 2, -1)}</div>}</> : <div className="truncate">Argus automation</div>}</div></div></td>
-                  <td>{ACTION_TEXT[e.action] ?? e.action}<div className="mono text-[11.5px] text-ink-soft">{e.action}</div></td>
+                  <td>{ACTION_TEXT[e.action] ?? e.action}</td>
                   <td>{e.application_id ? <Link href={`/applications/${e.application_id}`} onClick={(ev) => ev.stopPropagation()} className="mono no-underline">{e.ref_no}</Link> : <span className="text-ink-soft">–</span>}</td>
-                  <td><code className="mono inline-flex h-[20px] items-center rounded-md bg-surface-2 px-1.5 text-[11px] text-ink-soft ring-1 ring-inset ring-line" title={e.hash}>{e.hash.slice(0, 8)}</code></td>
                 </tr>
               ))}
             </tbody>

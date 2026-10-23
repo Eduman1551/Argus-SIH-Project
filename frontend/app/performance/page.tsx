@@ -4,7 +4,7 @@ import { useState } from "react";
 import { CheckCircle2, FlaskConical, XCircle } from "lucide-react";
 import { StageTimeBars } from "@/components/charts";
 import {
-  Button, Callout, Card, DocLayout, ErrorNote, HelpBox, NextStep, PageHeader, PageSkeleton, Section, Stamp, Table,
+  Button, Card, Collapsible, DocLayout, ErrorNote, HelpBox, NextStep, PageHeader, PageSkeleton, Section, Stamp, Table,
 } from "@/components/ui";
 import { api, useApi } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
@@ -63,10 +63,10 @@ export default function PerformancePage() {
 
   return (
     <div>
-      <PageHeader crumbs={[{ label: "Insight" }, { label: "Performance" }]} title="Performance and KPIs"
-        description={<>Measured live from the data as of <span className="mono">{fmtDate(data.as_of)}</span> (simulated). Nothing on this page is typed in by hand.</>}
+      <PageHeader crumbs={[{ label: "Reports" }, { label: "Performance" }]} title="Performance"
+        description={<>How well Argus keeps deadlines, measured from the data on <span className="mono">{fmtDate(data.as_of)}</span>.</>}
         action={<Button kind="primary" busy={running} onClick={runTest}><FlaskConical size={15} /> Run routing self-test</Button>} />
-      <HelpBox id="performance">Targets are <b>our own suggestions</b>, not official requirements. Advance the clock or take actions elsewhere and come back: every number is recomputed.</HelpBox>
+      <HelpBox id="performance">Targets are our own suggestions, not official requirements.</HelpBox>
 
       <DocLayout toc={TOC}>
         <div className="space-y-9">
@@ -88,7 +88,7 @@ export default function PerformancePage() {
                   </div>
                   <div className="mt-1.5 text-[12px] text-ink-soft">Suggested target: <span className="mono">{k.target === null ? "shown as a count" : `${k.target}${k.unit === "%" ? "%" : ` ${k.unit}`}`}</span></div>
                   <p className="mt-3 border-t border-line pt-3 text-[13.5px]">{k.explain}</p>
-                  <p className="mt-1 text-[12.5px] text-ink-soft">{detail(k)}</p>
+                  <p className="mt-1 text-[12px] text-ink-soft">{detail(k)}</p>
                 </div>
               );
             })}
@@ -131,7 +131,8 @@ export default function PerformancePage() {
         </Section>
 
         <Section id="method" title="How each KPI is measured">
-          <div className="surface p-4">
+          <div className="surface px-4 py-2">
+            <Collapsible title="Show the method">
             <dl className="divide-y divide-line text-[13.5px]">
               {[
                 ["Routing accuracy", "Every application's stage history is compared with the route fixed when it was submitted."],
@@ -144,9 +145,7 @@ export default function PerformancePage() {
                 <div key={k} className="grid gap-1 py-2.5 sm:grid-cols-[180px_minmax(0,1fr)]"><dt className="font-medium">{k}</dt><dd className="text-ink-soft">{v}</dd></div>
               ))}
             </dl>
-          </div>
-          <div className="mt-4">
-            <Callout kind="note" title="About the targets">The suggested targets are ours, chosen for this prototype. They are not official AICTE requirements, and the data behind them is synthetic.</Callout>
+            </Collapsible>
           </div>
         </Section>
         </div>

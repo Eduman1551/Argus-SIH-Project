@@ -3,7 +3,7 @@
 import { useState, type KeyboardEvent, type ReactNode } from "react";
 import { GripVertical, Minus, Pencil, Plus, Save, X } from "lucide-react";
 import {
-  Avatar, Button, Callout, Card, DocLayout, Empty, ErrorNote, Field, HelpBox, Modal, PageHeader, PageSkeleton, Section, Stamp, Table,
+  Avatar, Button, Callout, Card, Collapsible, DocLayout, Empty, ErrorNote, Field, HelpBox, Modal, PageHeader, PageSkeleton, Section, Stamp, Table,
 } from "@/components/ui";
 import { api, useApi } from "@/lib/api";
 import { addDays, fmtDate, fmtDateTime } from "@/lib/format";
@@ -101,9 +101,9 @@ export default function RulesPage() {
 
   return (
     <div>
-      <PageHeader crumbs={[{ label: "Configure" }, { label: "Rules and timelines" }]} title="Rules and timelines"
-        description="Routes, time limits, reminder days, the escalation chain and message templates. Changes apply at once, with no code change, and every change is audited." />
-      <HelpBox id="rules">Change a value and press Save. The grey preview under each rule shows the dates it would produce, using the simulated date. New reminder days take effect from today, so they never fire late for days already passed.</HelpBox>
+      <PageHeader crumbs={[{ label: "Rules" }]} title="Rules"
+        description="Time limits, reminders and who is alerted. Changes apply at once and are recorded." />
+      <HelpBox id="rules">Change a value and press Save. The grey line under each rule shows the dates it would give.</HelpBox>
 
       <DocLayout toc={TOC}>
         <div className="space-y-9">
@@ -175,7 +175,7 @@ export default function RulesPage() {
               <Table minWidth={760}>
                 <thead><tr><th>Template</th><th>Subject</th><th>SMS</th><th /></tr></thead>
                 <tbody>{data.templates.map((t) => (
-                  <tr key={t.code}><td className="font-medium">{t.label}<div className="mono text-[11.5px] font-normal text-ink-soft">{t.code}</div></td><td className="text-[13px]">{t.subject}</td>
+                  <tr key={t.code}><td className="font-medium">{t.label}</td><td className="text-[13px]">{t.subject}</td>
                     <td className="max-w-[260px] text-[12.5px] text-ink-soft">{t.sms}</td><td>{!ro && <Button small onClick={() => setEditTpl(t)}><Pencil size={13} /> Edit</Button>}</td></tr>
                 ))}</tbody>
               </Table>
@@ -188,10 +188,11 @@ export default function RulesPage() {
             </Card>
           </Section>
 
-          <Section id="history" title="Change history" description="The latest rule changes, straight from the tamper-evident audit trail.">
-            <Card pad={false}>
+          <Section id="history" title="Change history" description="The latest changes and who made them.">
+            <div className="surface px-4 py-2">
+              <Collapsible title={`Show changes (${history.data?.rows.length ?? 0})`}>
               {history.data?.rows.length ? (
-                <ol className="divide-y divide-line">
+                <ol className="divide-y divide-line pb-1">
                   {history.data.rows.map((c) => (
                     <li key={c.id} className="grid grid-cols-[120px_minmax(0,1fr)] gap-3 px-4 py-2.5 sm:grid-cols-[140px_200px_minmax(0,1fr)]">
                       <span className="mono text-[12px] text-ink-soft">{fmtDateTime(c.at)}</span>
@@ -204,7 +205,8 @@ export default function RulesPage() {
                   ))}
                 </ol>
               ) : <Empty title="No rule changes yet.">Every change made on this page is listed here with who made it and when.</Empty>}
-            </Card>
+              </Collapsible>
+            </div>
           </Section>
         </div>
       </DocLayout>
@@ -320,7 +322,6 @@ function ReminderRow({ e, active, ro, due, what }: {
   const [overdue, setOverdue] = useState(overdueInit);
   const [add, setAdd] = useState(3);
   const dirty = before.join() !== init.join() || overdue !== overdueInit;
-  const since = active.map((r) => r.effective_from).sort().at(-1);
   const sorted = [...before].sort((a, b) => b - a);
   const reset = () => { setBefore(init); setOverdue(overdueInit); };
   const submit = () => void save(`/api/rules/reminders/${e.code}`, { offsets: sorted.map((d) => -d), overdue }, `Reminder days for ${e.label.toLowerCase()} updated.`);
@@ -329,7 +330,6 @@ function ReminderRow({ e, active, ro, due, what }: {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-[13.5px] font-medium">{e.label}</div>
-          <div className="text-[12px] text-ink-soft">effective since <span className="mono">{fmtDate(since)}</span></div>
         </div>
         <SaveBar dirty={dirty} onReset={reset} onSave={submit} />
       </div>
@@ -365,7 +365,7 @@ function LevelRow({ l, targets, ro }: { l: Rules["escalation_levels"][number]; t
   const dirty = title !== l.title || target !== l.target;
   return (
     <li className="flex flex-wrap items-center gap-2.5 px-4 py-3">
-      <Stamp tone="escalated" level={l.level} />
+      <span className="mono w-7 text-[13px] font-semibold text-esc">L{l.level}</span>
       <input className="field h-8 min-w-[200px] flex-1 py-0 text-[13px]" value={title} disabled={ro} onChange={(e) => setTitle(e.target.value)} aria-label={`Title for level ${l.level}`} />
       <select className="field h-8 w-auto py-0 text-[13px]" value={target} disabled={ro} onChange={(e) => setTarget(e.target.value)} aria-label={`Who level ${l.level} goes to`}>
         {targets.map((t) => <option key={t.code} value={t.code}>{t.label}</option>)}

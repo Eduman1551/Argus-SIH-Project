@@ -38,11 +38,11 @@ export default function NotificationsPage() {
 
   return (
     <div>
-      <PageHeader crumbs={[{ label: "Notifications" }]} title="Notifications" description="Everything Argus has told you, and the simulated email and SMS delivery log."
+      <PageHeader crumbs={[{ label: "Notifications" }]} title="Notifications" description="Your alerts, and the email and SMS log."
         action={tab === "inbox" && (notes.data?.unread ?? 0) > 0 ? <Button onClick={() => act("/api/notifications/read-all", {}, "All marked as read.")}><CheckCheck size={15} /> Mark all read</Button> : undefined} />
-      <HelpBox id="notifications">Each alert creates an in-app notification here plus an email and an SMS in the delivery log. <b>No real email or SMS is sent</b> in this prototype; the log shows what would be delivered and its status.</HelpBox>
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: "inbox", label: <span className="inline-flex items-center gap-1.5"><Bell size={14} /> Notification centre ({notes.data?.unread ?? 0} unread)</span> },
-        { id: "log", label: <span className="inline-flex items-center gap-1.5"><Mail size={14} /> Simulated email / SMS log</span> }]} />
+      <HelpBox id="notifications">Each alert also appears in the email and SMS log. No real email or SMS is sent.</HelpBox>
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: "inbox", label: <span className="inline-flex items-center gap-1.5"><Bell size={14} /> Alerts ({notes.data?.unread ?? 0} unread)</span> },
+        { id: "log", label: <span className="inline-flex items-center gap-1.5"><Mail size={14} /> Email and SMS log</span> }]} />
 
       {tab === "inbox" ? (
         notes.loading ? <PageSkeleton /> : notes.error ? <ErrorNote error={notes.error} onRetry={notes.reload} /> : (

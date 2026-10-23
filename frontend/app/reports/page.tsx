@@ -1,9 +1,9 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useCallback, useState } from "react";
 import { Download } from "lucide-react";
-import { Card, Empty, ErrorNote, HelpBox, Metrics, NextStep, PageHeader, PageSkeleton, SlaStamp, Stamp, Stat, Table, Tabs } from "@/components/ui";
+import { Card, Drawer, Empty, ErrorNote, HelpBox, KeyVal, Metrics, NextStep, PageHeader, PageSkeleton, SlaStamp, Stamp, Stat, Table, Tabs, useRowNav } from "@/components/ui";
 import { useApi } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
 import { EVC_CATEGORY } from "@/lib/labels";
@@ -40,14 +40,19 @@ function ReportsInner() {
   const regions = useApi<{ id: number; name: string }[]>("/api/regions");
   const q = region ? `?region_id=${region}` : "";
   const { data, error, loading, reload } = useApi<Report>(user.role === "official" ? `/api/reports/${name}${q}` : null);
+  const [row, setRow] = useState<Record<string, unknown> | null>(null);
+  const rows = data?.rows ?? [];
+  const onOpen = useCallback((i: number) => setRow(rows[i] ?? null), [rows]);
+  const rowProps = useRowNav(rows.length, onOpen);
+  const label = (k: string) => (k.charAt(0).toUpperCase() + k.slice(1)).replaceAll("_", " ").replace(/\baicte\b/i, "AICTE").replace(/\bevc\b/i, "EVC");
   if (user.role !== "official") return <ErrorNote error={{ message: "Reports are for officials." }} />;
 
   return (
     <div>
-      <PageHeader crumbs={[{ label: "Insight" }, { label: "Reports" }]} title="Reports" description="Six standard reports, built from the same data as the dashboards. Totals here always match the dashboard."
+      <PageHeader crumbs={[{ label: "Reports" }]} title="Reports" description="Six standard reports. Totals match the dashboard."
         action={<a href={`/api/reports/${name}${q ? `${q}&` : "?"}format=csv`} className="inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand bg-brand px-3.5 text-[13.5px] font-medium text-white no-underline shadow-sm transition-colors hover:border-brand-hover hover:bg-brand-hover hover:text-white" download>
           <Download size={15} /> Download CSV</a>} />
-      <HelpBox id="reports">Pick a report, optionally filter by Region, and download it as CSV for meetings or follow-up letters. Every CSV is marked as synthetic data.</HelpBox>
+      <HelpBox id="reports">Pick a report and download it as CSV. Click a row to see every field.</HelpBox>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <Tabs className="" value={name} onChange={setName} tabs={LIST.map(([id, label]) => ({ id, label }))} />
         <div className="flex items-center gap-2">
@@ -59,24 +64,31 @@ function ReportsInner() {
       </div>
       {loading ? <PageSkeleton /> : error || !data ? <ErrorNote error={error ?? { message: "No data" }} onRetry={reload} /> : (
         <>
-          <Metrics className="!grid-flow-row !auto-cols-auto sm:!grid-cols-4 lg:!grid-cols-8 [&>*]:border-b">
-            {Object.entries(data.totals).map(([k, v]) => (
-              <Stat key={k} label={(k.charAt(0).toUpperCase() + k.slice(1)).replaceAll("_", " ").replace(/\baicte\b/i, "AICTE").replace(/\bevc\b/i, "EVC")} value={v}
-                tone={/overdue|expired|delayed/.test(k) && v ? "red" : "ink"} />
+          <Metrics>
+            {Object.entries(data.totals).slice(0, 4).map(([k, v]) => (
+              <Stat key={k} label={label(k)} value={v} tone={/overdue|expired|delayed/.test(k) && v ? "red" : "ink"} />
             ))}
           </Metrics>
-          <Card title={data.title} subtitle={`${data.rows.length} row(s)`} pad={false}>
+          {Object.keys(data.totals).length > 4 && (
+            <p className="-mt-3 mb-5 text-[12.5px] text-ink-soft">
+              Also: {Object.entries(data.totals).slice(4).map(([k, v]) => `${label(k)} ${v}`).join(" · ")}
+            </p>
+          )}
+          <Card title={data.title} subtitle={`${data.rows.length} rows${data.columns.length > 6 ? ", main columns shown; the CSV has them all" : ""}`} pad={false}>
             {data.rows.length ? (
               <div>
-                <Table minWidth={Math.max(1000, data.columns.length * 140)} maxHeight={620}>
-                  <thead><tr>{data.columns.map((c) => <th key={c.key}>{c.label}</th>)}</tr></thead>
-                  <tbody>{data.rows.map((r, i) => <tr key={i}>{data.columns.map((c) => <td key={c.key}>{cell(c.key, r[c.key], r)}</td>)}</tr>)}</tbody>
+                <Table minWidth={860} maxHeight={620}>
+                  <thead><tr>{data.columns.slice(0, 6).map((c) => <th key={c.key}>{c.label}</th>)}</tr></thead>
+                  <tbody>{data.rows.map((r, i) => <tr key={i} {...rowProps(i)}>{data.columns.slice(0, 6).map((c) => <td key={c.key}>{cell(c.key, r[c.key], r)}</td>)}</tr>)}</tbody>
                 </Table>
               </div>
             ) : <Empty title="Nothing to report for this filter." />}
           </Card>
         </>
       )}
+      <Drawer open={!!row} onClose={() => setRow(null)} title={data?.title ?? ""} subtitle={row ? String(row[data?.columns[0]?.key ?? ""] ?? "") : undefined}>
+        {row && data && <KeyVal items={data.columns.map((c) => [c.label, cell(c.key, row[c.key], row)] as [string, React.ReactNode])} />}
+      </Drawer>
       <NextStep href="/audit" label="audit trail" />
     </div>
   );

@@ -34,17 +34,17 @@ export default function ValidityPage() {
 
   return (
     <div>
-      <PageHeader crumbs={[{ label: "Monitoring" }, { label: "Document validity" }]} title="Document validity" description="Leases, fire NOCs and other documents institutions must keep valid. Argus warns before expiry and escalates when a document lapses."
+      <PageHeader crumbs={[{ label: "Monitoring" }, { label: "Document validity" }]} title="Document validity" description="Leases and other documents institutions must keep valid."
         action={user.official_kind === "regional" ? (
           <Tabs className="" value={all ? "all" : "mine"} onChange={(v) => setAll(v === "all")}
             tabs={[{ id: "mine", label: "My Region" }, { id: "all", label: "All Regions" }]} />) : undefined} />
-      <HelpBox id="validity">Click a state to filter. Renewals submitted by institutions wait for your verification; once verified, the new expiry date applies and tracking starts again.</HelpBox>
+      <HelpBox id="validity">Click a number to filter. Check renewals sent in by institutions.</HelpBox>
       <Metrics>
         {STATES.map((s) => (
           <button key={s.id} onClick={() => setFilter(filter === s.id ? "" : s.id)} aria-pressed={filter === s.id}
             className={`text-left transition-colors hover:bg-surface-2 ${filter === s.id ? "bg-brand-tint/70 shadow-[inset_0_-2px_0_var(--brand)]" : ""}`}>
             <Stat label={s.label} value={rows.filter((d) => d.state === s.id).length} tone={rows.some((d) => d.state === s.id) ? s.tone : "ink"}
-              hint={s.id === "expiring_soon" ? `Within ${data.expiring_soon_days} days` : filter === s.id ? "Filtering the list" : "Click to filter"} />
+              hint={s.id === "expiring_soon" ? `Within ${data.expiring_soon_days} days` : filter === s.id ? "Showing these" : undefined} />
           </button>
         ))}
       </Metrics>
@@ -52,12 +52,12 @@ export default function ValidityPage() {
       <Card title={filter ? STATES.find((s) => s.id === filter)!.label : "All tracked documents"} subtitle={`${shown.length} document(s)`} pad={false}>
         {shown.length ? (
           <Table minWidth={900}>
-            <thead><tr><th>Institution</th><th>Document</th><th style={{ width: 150 }}>Validity used</th><th>Expires</th><th>State</th><th>Renewal</th></tr></thead>
+            <thead><tr><th>Institution</th><th>Document</th><th style={{ width: 150 }}>Time used</th><th>Expires</th><th>State</th><th>Renewal</th></tr></thead>
             <tbody>
               {shown.map((d) => (
                 <tr key={d.id}>
                   <td>{d.institution}<div className="text-[12.5px] text-ink-soft">{d.region}</div></td>
-                  <td>{d.title}<div className="text-[12.5px] text-ink-soft">{d.issued_by}</div></td>
+                  <td>{d.title}</td>
                   <td>{today && d.valid_from ? <ValidityBar from={d.valid_from} to={d.expires_on} today={today} state={d.state} compact /> : null}</td>
                   <td><DueCell date={d.expires_on} days={d.days_to_expiry} fmt={fmtDate} /></td>
                   <td><DocState state={d.state} level={d.escalation_level} />{d.status === "renewal_rejected" && <div className="mt-1 text-[12px] text-danger-ink">Last renewal not accepted</div>}</td>
@@ -67,7 +67,7 @@ export default function ValidityPage() {
                         <div>New expiry <span className="mono">{fmtDate(d.renewal_expires_on)}</span> · <a href={`/api/files/${d.renewal_file_id}`} download>view file</a></div>
                         <VerifyButtons path={`/api/tracked-documents/${d.id}/verify`} what="Renewal" />
                       </div>
-                    ) : <span className="text-[13px] text-ink-soft">{d.verified_at ? `Last verified ${fmtDate(d.verified_at)}` : "–"}</span>}
+                    ) : <span className="text-[13px] text-ink-soft">{"–"}</span>}
                   </td>
                 </tr>
               ))}

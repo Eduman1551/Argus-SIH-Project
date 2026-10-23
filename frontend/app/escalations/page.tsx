@@ -6,7 +6,7 @@ import { ArrowRight, Flag } from "lucide-react";
 import { EscalationLadder, nextStep, useEscalationRules, type Rung } from "@/components/viz/EscalationLadder";
 import { daysBetween } from "@/components/viz/SlaBar";
 import {
-  Card, Drawer, Empty, ErrorNote, HelpBox, KeyVal, LinkButton, NextStep, PageHeader, PageSkeleton, Stamp, Table, Tabs, useRowNav,
+  Card, Collapsible, Drawer, Empty, ErrorNote, HelpBox, KeyVal, LinkButton, NextStep, PageHeader, PageSkeleton, Stamp, Table, Tabs, useRowNav,
 } from "@/components/ui";
 import { useApi } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
@@ -77,11 +77,11 @@ export default function EscalationsPage() {
   return (
     <div>
       <PageHeader crumbs={[{ label: "Monitoring" }, { label: "Escalations" }]} title="Escalations"
-        description="Overdue items that have gone up the chain. Each clears automatically on the next check once the item is completed."
+        description="Overdue items sent up the chain. Each one clears when the item is done."
         action={user.official_kind === "regional" ? (
           <Tabs className="" value={all ? "all" : "mine"} onChange={(v) => setAll(v === "all")}
             tabs={[{ id: "mine", label: "My Region" }, { id: "all", label: "All Regions" }]} />) : undefined} />
-      <HelpBox id="escalations">The chain and the number of days before each level are set on the Rules page. Click an item to see who was alerted at each level and when the next level is due.</HelpBox>
+      <HelpBox id="escalations">Click an item to see who was alerted and when it goes up next.</HelpBox>
 
       <div className="surface enter mb-6 grid divide-y divide-line md:grid-cols-3 md:divide-x md:divide-y-0" aria-label="Open items by highest level reached">
         {[...data.levels].reverse().map((l) => {
@@ -99,21 +99,20 @@ export default function EscalationsPage() {
         })}
       </div>
 
-      <Card title="Open escalations" subtitle="Highest level first, then most overdue. Click a row to see its ladder." pad={false} className="mb-6">
+      <Card title="Open escalations" subtitle="Highest level first. Click a row for details." pad={false} className="mb-6">
         {items.length ? (
           <Table minWidth={980}>
-            <thead><tr><th>Item</th><th>Institution</th><th>Was due</th><th className="num">Days late</th><th>Reached</th><th>Next level</th></tr></thead>
+            <thead><tr><th>Item</th><th>Institution</th><th className="num">Days late</th><th>Level</th><th>Next level</th></tr></thead>
             <tbody>
               {items.map((it, i) => {
                 const e = it.top;
                 const left = it.next && today ? daysBetween(today, it.next.date) : null;
                 return (
                   <tr key={it.key} {...rowProps(i)} aria-label={`Show ladder for ${itemName(e)}`}>
-                    <td className="max-w-[340px]"><div className="font-medium leading-snug">{itemName(e)}</div><div className="text-[12px] text-ink-soft">{ENTITY_TEXT[e.entity_type]}{e.ref_no ? <> · <span className="mono">{e.ref_no}</span></> : ""}</div></td>
+                    <td className="max-w-[340px]"><div className="font-medium leading-snug">{itemName(e)}</div><div className="text-[12px] text-ink-soft">{ENTITY_TEXT[e.entity_type]}</div></td>
                     <td>{e.institution}<div className="text-[12px] text-ink-soft">{e.region}</div></td>
-                    <td className="mono">{fmtDate(e.due_date)}</td>
                     <td className="num mono font-semibold text-danger-ink">{e.days_overdue}</td>
-                    <td><Pips level={it.level} /><div className="mt-1 text-[12px] text-ink-soft">{e.target}</div></td>
+                    <td><Pips level={it.level} /></td>
                     <td>{it.level >= 3 ? <span className="text-[12.5px] text-ink-soft">Top of the chain</span>
                       : it.next ? <span className="text-[12.5px]"><b className="font-medium text-esc">L{it.next.level}</b> <span className="mono">{left != null && left <= 0 ? "today" : `in ${left} d`}</span><div className="mono text-[11.5px] text-ink-soft">{fmtDate(it.next.date)}</div></span>
                       : <span className="text-[12.5px] text-ink-soft">–</span>}</td>
@@ -125,16 +124,20 @@ export default function EscalationsPage() {
         ) : <Empty title="No open escalations.">Advance the clock from the date chip to see overdue items escalate.</Empty>}
       </Card>
 
-      <Card title="Recently resolved" subtitle="Cleared once the overdue item was completed" pad={false}>
-        {data.resolved.length ? (
-          <Table>
-            <thead><tr><th>Level</th><th>Item</th><th>Institution</th><th>Resolved</th></tr></thead>
-            <tbody>{data.resolved.map((e) => (
-              <tr key={e.id}><td><Stamp tone="closed">L{e.level} resolved</Stamp></td><td className="max-w-[360px]">{itemName(e)}</td><td>{e.institution}</td><td className="mono">{fmtDate(e.resolved_at)}</td></tr>
-            ))}</tbody>
-          </Table>
-        ) : <Empty title="Nothing resolved yet." />}
-      </Card>
+      {data.resolved.length > 0 && (
+        <div className="surface px-4 py-2">
+          <Collapsible title={`Recently resolved (${data.resolved.length})`}>
+            <ul className="divide-y divide-line pb-1">
+              {data.resolved.map((e) => (
+                <li key={e.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5 text-[13.5px]">
+                  <span>{itemName(e)} <span className="text-ink-soft">· {e.institution}</span></span>
+                  <span className="flex items-center gap-3"><Stamp tone="closed">L{e.level} cleared</Stamp><span className="mono text-[12px] text-ink-soft">{fmtDate(e.resolved_at)}</span></span>
+                </li>
+              ))}
+            </ul>
+          </Collapsible>
+        </div>
+      )}
 
       <Drawer open={!!sel} onClose={() => setOpen(null)} title={sel ? itemName(sel.top) : ""}
         subtitle={sel ? <>{ENTITY_TEXT[sel.top.entity_type]} · {sel.top.institution}</> : undefined}

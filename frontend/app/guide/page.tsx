@@ -85,9 +85,7 @@ export default function GuidePage() {
                   ["Synthetic data", "Every institution, officer, committee member and case is fictional."],
                   ["Illustrative rules", "Routes, time limits, reminder days and escalation days are assumptions, not official APH figures."],
                   ["Humans decide", "Argus never approves, rejects, grants or denies. Decisions are recorded by the competent authority."],
-                  ["Simulated delivery and time", "Emails and SMS are only logged, and the date is a simulated clock you can move forward."],
-                  ["Demo sign-in", "A demo user picker stands in for real login. Access rules are still enforced on every request."],
-                  ["Measured numbers", "Every count and KPI comes from the data or a real run; nothing is typed in by hand."],
+                  ["Simulated", "Emails and SMS are only logged, the date is a clock you can move forward, and sign-in is a demo user picker."],
                 ].map(([k, v]) => (
                   <li key={k} className="flex gap-2.5 rounded-xl bg-surface-2 p-3 ring-1 ring-inset ring-line">
                     <Check size={15} className="mt-0.5 shrink-0 text-brand" aria-hidden />

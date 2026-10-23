@@ -10,13 +10,12 @@ import { dueText, fmtDate } from "@/lib/format";
 import { useApp } from "@/lib/store";
 import type { Visit } from "@/lib/types";
 
-const COLUMNS: { id: string; title: string; hint: string }[] = [
-  { id: "queue", title: "Queue", hint: "Members to be assigned" },
-  { id: "coordinating", title: "Coordinating", hint: "Availability and date" },
-  { id: "scheduled", title: "Scheduled", hint: "Visit date fixed" },
-  { id: "due", title: "Due now", hint: "Visit within the due window" },
-  { id: "report", title: "Report stage", hint: "Report pending or in review" },
-  { id: "delayed", title: "Delayed", hint: "A step is past its limit" },
+const COLUMNS: { id: string; cats: string[]; title: string; hint: string }[] = [
+  { id: "arrange", cats: ["queue", "coordinating"], title: "To arrange", hint: "Members and date" },
+  { id: "scheduled", cats: ["scheduled"], title: "Scheduled", hint: "Date fixed" },
+  { id: "due", cats: ["due"], title: "Due now", hint: "Visit is close" },
+  { id: "report", cats: ["report"], title: "Report", hint: "Report awaited or in review" },
+  { id: "delayed", cats: ["delayed"], title: "Delayed", hint: "A step is late" },
 ];
 
 export default function EvcBoard() {
@@ -24,7 +23,7 @@ export default function EvcBoard() {
   const [all, setAll] = useState(user.official_kind !== "regional");
   const { data, error, loading, reload } = useApi<{ visits: Visit[]; window_days: number }>(
     user.role === "official" ? `/api/evc/board${all ? "?all_regions=true" : ""}` : null);
-  if (user.role !== "official") return <ErrorNote error={{ message: "The EVC board is for officials." }} />;
+  if (user.role !== "official") return <ErrorNote error={{ message: "Expert visits are managed by officials." }} />;
   if (loading) return <PageSkeleton />;
   if (error || !data) return <ErrorNote error={error ?? { message: "No data" }} onRetry={reload} />;
   const by = (c: string) => data.visits.filter((v) => v.category === c);
@@ -33,25 +32,23 @@ export default function EvcBoard() {
 
   return (
     <div>
-      <PageHeader crumbs={[{ label: "Monitoring" }, { label: "EVC board" }]} title="EVC scheduling board"
-        description="Every Expert Visit Committee visit, from assignment to report review. Delayed visits sit in the last column."
+      <PageHeader crumbs={[{ label: "Monitoring" }, { label: "Expert visits" }]} title="Expert visits"
+        description="Every expert visit, from arranging it to the report. Late visits are in the last column."
         action={user.official_kind === "regional" ? (
           <Tabs className="" value={all ? "all" : "mine"} onChange={(v) => setAll(v === "all")}
             tabs={[{ id: "mine", label: `My Region` }, { id: "all", label: "All Regions" }]} />) : undefined} />
       <HelpBox id="evc">
-        Each card is one visit. Open it to assign members, fix the date or review the report. A visit moves to <b>Delayed</b> when any step
-        passes its configured limit; reminders and escalations for it are sent automatically.
+        Each card is one visit. Open it to assign members, fix the date or review the report.
       </HelpBox>
       <Metrics>
         <Stat label="Open visits" value={data.visits.length - completed} hint={all ? "All Regions" : user.region_name ?? ""} />
-        <Stat label="Due now" value={by("due").length} tone={by("due").length ? "warn" : "ink"} hint={`Visit within ${data.window_days} days`} />
-        <Stat label="Delayed" value={delayed} tone={delayed ? "red" : "good"} hint="A step past its limit" />
-        <Stat label="Completed" value={completed} tone="good" hint="Report reviewed" />
+        <Stat label="Due now" value={by("due").length} tone={by("due").length ? "warn" : "ink"} hint={`Within ${data.window_days} days`} />
+        <Stat label="Delayed" value={delayed} tone={delayed ? "red" : "good"} hint="A step is late" />
       </Metrics>
       {data.visits.length === 0 ? <Empty title="No expert visits yet.">Visits appear here when a case reaches its EVC stage.</Empty> : (
-        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
           {COLUMNS.map((col) => {
-            const items = by(col.id);
+            const items = data.visits.filter((v) => col.cats.includes(v.category));
             const bad = col.id === "delayed" && items.length > 0;
             return (
               <section key={col.id} aria-label={`${col.title}: ${items.length}`}
@@ -87,7 +84,7 @@ export default function EvcBoard() {
           })}
         </div>
       )}
-      <NextStep href="/compliance" label="undertakings and verification" />
+      <NextStep href="/compliance" label="compliance" />
     </div>
   );
 }
