@@ -61,14 +61,14 @@ function ReportsInner() {
         <>
           <Metrics className="!grid-flow-row !auto-cols-auto sm:!grid-cols-4 lg:!grid-cols-8 [&>*]:border-b">
             {Object.entries(data.totals).map(([k, v]) => (
-              <Stat key={k} label={k.charAt(0).toUpperCase() + k.slice(1).replaceAll("_", " ")} value={v}
+              <Stat key={k} label={(k.charAt(0).toUpperCase() + k.slice(1)).replaceAll("_", " ").replace(/\baicte\b/i, "AICTE").replace(/\bevc\b/i, "EVC")} value={v}
                 tone={/overdue|expired|delayed/.test(k) && v ? "red" : "ink"} />
             ))}
           </Metrics>
           <Card title={data.title} subtitle={`${data.rows.length} row(s)`} pad={false}>
             {data.rows.length ? (
               <div>
-                <Table minWidth={1000} maxHeight={620}>
+                <Table minWidth={Math.max(1000, data.columns.length * 140)} maxHeight={620}>
                   <thead><tr>{data.columns.map((c) => <th key={c.key}>{c.label}</th>)}</tr></thead>
                   <tbody>{data.rows.map((r, i) => <tr key={i}>{data.columns.map((c) => <td key={c.key}>{cell(c.key, r[c.key], r)}</td>)}</tr>)}</tbody>
                 </Table>

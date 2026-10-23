@@ -212,8 +212,8 @@ function CurrentStage({ data, has, open }: { data: CaseDetail; has: (x: string) 
   const paused = cur.paused_at != null;
   const bar = today ? caseSla(data, today) : null;
   const who = sla?.waiting_on === "institution" ? data.application.institution
-    : sla?.waiting_on === "committee" && data.visit ? "EVC members"
-    : sla?.waiting_on === "committee" && data.review ? "SAC/SHC members"
+    : sla?.waiting_on === "committee" && cur.stage_code === "sac" ? "SAC/SHC members"
+    : sla?.waiting_on === "committee" ? "EVC members"
     : cur.assignee ?? "Unassigned";
   return (
     <div>
