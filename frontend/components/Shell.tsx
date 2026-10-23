@@ -16,7 +16,6 @@ import { NotificationsButton } from "./shell/NotificationsPopover";
 import { Popover } from "./shell/Popover";
 import { scopeText, UserMenu, ROLE_TEXT } from "./shell/UserMenu";
 
-const VERSION = "v1.1";
 const README = "https://github.com/Eduman1551/Argus-SIH-Project#readme";
 
 /* ================================================================ live polling */
@@ -108,10 +107,10 @@ function Navbar({ user, onPalette }: { user: SessionUser | null; onPalette: () =
         <div className="ml-auto flex items-center gap-1">
           {user && (
             <>
-              <button onClick={onPalette} aria-label="Search or jump to (Ctrl K)"
+              <button onClick={onPalette} aria-label="Search (Ctrl K)"
                 className="flex h-9 items-center gap-2 rounded-lg border border-line bg-surface/70 px-2.5 text-[13px] text-ink-soft hover:bg-surface hover:text-ink">
                 <Search size={15} aria-hidden />
-                <span className="hidden xl:inline">Search or jump to…</span>
+                <span className="hidden xl:inline">Search</span>
                 <span className="hidden xl:inline-flex"><Kbd>Ctrl K</Kbd></span>
               </button>
               <ClockChip />
@@ -232,7 +231,6 @@ function Footer() {
     <footer className="mt-6 border-t border-line">
       <div className="mx-auto flex max-w-[1280px] flex-wrap items-center gap-x-5 gap-y-2 px-4 py-5 text-[12px] text-ink-soft sm:px-6">
         <span className="font-medium text-ink">Argus</span>
-        <span className="mono">{VERSION}</span>
         <span>Prototype · all data is synthetic</span>
         <span className="ml-auto flex gap-4">
           <Link href="/guide" className="text-ink-soft no-underline hover:text-brand">Guide</Link>

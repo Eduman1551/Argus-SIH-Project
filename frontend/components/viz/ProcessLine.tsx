@@ -54,14 +54,13 @@ export function ProcessLine({ rows, value, onChange }: { rows: PendencyRow[]; va
                   {on && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
                 </span>
                 <span className={`mt-2 text-[13px] font-medium ${on ? "text-brand-hover" : "text-ink"}`}>{s.label}</span>
-                <span className="text-[11.5px] text-ink-soft">{s.who}</span>
                 <span className="mono mt-1.5 text-[26px] font-semibold leading-none tracking-[-0.03em] text-ink">{list.length}</span>
                 <span className={`mt-1 h-[16px] text-[11.5px] ${overdue ? "font-medium text-danger-ink" : "text-ink-soft"}`}>
-                  {overdue ? `${overdue} overdue` : list.length ? `avg ${avg}d here` : "none"}
+                  {overdue ? `${overdue} overdue` : list.length ? `about ${avg} days` : "none"}
                 </span>
                 <span className="mt-1.5 flex min-h-[10px] max-w-[110px] flex-wrap justify-center gap-[3px]" aria-hidden>
                   {list.slice(0, MAX_DOTS).map((r) => (
-                    <span key={r.id} className="h-[7px] w-[7px] rounded-full" style={{ background: dotColour(r) }} title={`${r.ref_no}: ${r.days_in_stage} days here`} />
+                    <span key={r.id} className="h-[7px] w-[7px] rounded-full" style={{ background: dotColour(r) }} title={`${r.ref_no}: ${r.days_in_stage} days at this step${r.sla_status === "overdue" ? ", overdue" : ""}`} />
                   ))}
                   {list.length > MAX_DOTS && <span className="mono text-[10px] leading-[7px] text-ink-soft">+{list.length - MAX_DOTS}</span>}
                 </span>
@@ -70,12 +69,6 @@ export function ProcessLine({ rows, value, onChange }: { rows: PendencyRow[]; va
           );
         })}
       </ol>
-      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line pt-2.5 text-[12px] text-ink-soft">
-        <span>One dot per case, by days at the stage:</span>
-        {[["under 7", RAMP[1]], ["7–20", RAMP[2]], ["21–44", RAMP[3]], ["45+", RAMP[4]], ["overdue", "var(--red)"]].map(([l, c]) => (
-          <span key={l} className="flex items-center gap-1.5"><span className="h-[7px] w-[7px] rounded-full" style={{ background: c }} />{l}</span>
-        ))}
-      </div>
     </div>
   );
 }

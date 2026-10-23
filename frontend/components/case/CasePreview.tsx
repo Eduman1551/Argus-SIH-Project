@@ -59,7 +59,9 @@ function PreviewBody({ appId }: { appId: number }) {
         ["Status", a.status === "decided" ? `Decided: ${a.decision?.replaceAll("_", " ")}` : data.sla?.substatus_text ?? "–"],
         ["With", data.sla?.waiting_on === "institution" ? a.institution : <Owner key="o" name={data.current?.assignee} />],
         ["Next due", data.sla?.due_date ? <span key="d" className="mono">{fmtDate(data.sla.due_date)} · {dueText(data.sla.days_to_due)}</span> : "–"],
-        ["Submitted", <span key="s" className="mono">{fmtDate(a.submitted_at)}</span>],
+        ["Institution", `${a.institution}, ${a.region}`],
+        ["Type", a.type_name],
+        ["Submitted", <span key="s" className="mono">{fmtDate(a.submitted_at)}{data.sla ? ` · ${data.sla.age_days} days ago` : ""}</span>],
       ]} />
       <div>
         <div className="mb-2 font-medium">Latest activity</div>

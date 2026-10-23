@@ -8,23 +8,23 @@ export interface NavLink { href: string; label: string; icon: LucideIcon; hint?:
 export interface NavGroup { label: string; href?: string; items?: NavLink[] }
 
 export const PAGES: Record<string, NavLink> = {
-  home: { href: "/", label: "Home", icon: Home, hint: "Your applications and what is due" },
-  overview: { href: "/", label: "Overview", icon: Gauge, hint: "Pendency, deadlines and Regions" },
-  queue: { href: "/queue", label: "My queue", icon: Inbox, hint: "Work assigned to you" },
-  applications: { href: "/applications", label: "Applications", icon: FolderOpen, hint: "Every case, filterable" },
-  evc: { href: "/evc", label: "EVC board", icon: CalendarClock, hint: "Expert visits, from queue to report" },
-  compliance: { href: "/compliance", label: "Compliance", icon: ClipboardCheck, hint: "Undertakings and evidence" },
-  validity: { href: "/validity", label: "Document validity", icon: FileClock, hint: "Leases and other expiring documents" },
-  escalations: { href: "/escalations", label: "Escalations", icon: AlertOctagon, hint: "Overdue items by level" },
-  reports: { href: "/reports", label: "Reports", icon: FileText, hint: "Six reports with CSV export" },
-  audit: { href: "/audit", label: "Audit trail", icon: ShieldCheck, hint: "Hash-chained record of every action" },
-  performance: { href: "/performance", label: "Performance", icon: BarChart3, hint: "The eight KPIs, measured live" },
-  rules: { href: "/settings/rules", label: "Rules and timelines", icon: Settings2, hint: "Routes, time limits, reminders" },
-  undertakings: { href: "/undertakings", label: "Undertakings", icon: ClipboardCheck, hint: "Conditions and evidence" },
-  documents: { href: "/documents", label: "Documents", icon: FileClock, hint: "Validity and renewals" },
-  myCases: { href: "/my-cases", label: "My cases", icon: Briefcase, hint: "Visits and reviews assigned to you" },
-  notifications: { href: "/notifications", label: "Notifications", icon: Bell, hint: "Alerts and the delivery log" },
-  guide: { href: "/guide", label: "Guide", icon: BookOpen, hint: "How to use Argus and the demo" },
+  home: { href: "/", label: "Home", icon: Home, hint: "What is due" },
+  overview: { href: "/", label: "Overview", icon: Gauge, hint: "Where cases stand" },
+  queue: { href: "/queue", label: "My queue", icon: Inbox, hint: "Your work" },
+  applications: { href: "/applications", label: "Applications", icon: FolderOpen, hint: "All cases" },
+  evc: { href: "/evc", label: "Expert visits", icon: CalendarClock, hint: "Visit scheduling board" },
+  compliance: { href: "/compliance", label: "Compliance", icon: ClipboardCheck, hint: "Undertakings to verify" },
+  validity: { href: "/validity", label: "Document validity", icon: FileClock, hint: "Leases and expiring documents" },
+  escalations: { href: "/escalations", label: "Escalations", icon: AlertOctagon, hint: "Overdue items sent up the chain" },
+  reports: { href: "/reports", label: "Reports", icon: FileText, hint: "Download as CSV" },
+  audit: { href: "/audit", label: "Audit trail", icon: ShieldCheck, hint: "Who did what, and when" },
+  performance: { href: "/performance", label: "Performance", icon: BarChart3, hint: "How well deadlines are met" },
+  rules: { href: "/settings/rules", label: "Rules", icon: Settings2, hint: "Time limits and reminders" },
+  undertakings: { href: "/undertakings", label: "Undertakings", icon: ClipboardCheck, hint: "Conditions to meet" },
+  documents: { href: "/documents", label: "Documents", icon: FileClock, hint: "Renew before expiry" },
+  myCases: { href: "/my-cases", label: "My cases", icon: Briefcase, hint: "Your visits and reviews" },
+  notifications: { href: "/notifications", label: "Notifications", icon: Bell, hint: "Your alerts" },
+  guide: { href: "/guide", label: "Guide", icon: BookOpen, hint: "How to use Argus" },
 };
 
 export function navFor(user: SessionUser): NavGroup[] {
@@ -34,8 +34,8 @@ export function navFor(user: SessionUser): NavGroup[] {
       { label: "Overview", href: "/" },
       { label: "Cases", items: [P.queue, P.applications] },
       { label: "Monitoring", items: [P.evc, P.compliance, P.validity, P.escalations] },
-      { label: "Insight", items: [P.reports, P.audit, P.performance] },
-      ...(user.is_bureau ? [{ label: "Configure", items: [P.rules] }] : []),
+      { label: "Reports", items: [P.reports, P.performance, P.audit] },
+      ...(user.is_bureau ? [{ label: "Rules", href: P.rules.href }] : []),
     ],
     institution: [
       { label: "Home", href: "/" },
@@ -45,7 +45,6 @@ export function navFor(user: SessionUser): NavGroup[] {
     ],
     committee: [
       { label: "My cases", href: "/my-cases" },
-      { label: "Performance", href: "/performance" },
       { label: "Guide", href: "/guide" },
     ],
   };

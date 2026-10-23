@@ -5,7 +5,7 @@ import { useState } from "react";
 import { ChevronDown, Send } from "lucide-react";
 import { FileList, FilePicker } from "@/components/Files";
 import { UndertakingState } from "@/components/status";
-import { Button, Callout, Card, Empty, ErrorNote, Field, HelpBox, Metrics, NextStep, PageHeader, PageSkeleton, Stat } from "@/components/ui";
+import { Button, Callout, Card, Collapsible, Empty, ErrorNote, Field, HelpBox, Metrics, NextStep, PageHeader, PageSkeleton, Stat } from "@/components/ui";
 import { act, useApi } from "@/lib/api";
 import { dueText, fmtDate } from "@/lib/format";
 import { useApp } from "@/lib/store";
@@ -45,13 +45,12 @@ export default function UndertakingsPage() {
   return (
     <div>
       <PageHeader crumbs={[{ label: "Institution", href: "/" }, { label: "Undertakings" }]} title="Undertakings"
-        description="Conditions attached to your approvals, each with a due date. Upload evidence before the date; AICTE verifies it and closes the undertaking." />
-      <HelpBox id="undertakings">Argus reminds you 30, 15, 7 and 1 day(s) before a due date (illustrative settings). If evidence is not verified by the due date, the undertaking is escalated.</HelpBox>
+        description="Conditions from your approvals. Upload evidence before the due date." />
+      <HelpBox id="undertakings">Argus reminds you before each due date. AICTE checks your evidence and closes the item.</HelpBox>
       <Metrics>
-        <Stat label="Open" value={open.length} />
-        <Stat label="Overdue" value={open.filter((u) => u.state === "overdue").length} tone="red" />
-        <Stat label="Awaiting verification" value={open.filter((u) => u.state === "awaiting_verification").length} tone="warn" />
-        <Stat label="Closed" value={closed.length} tone="good" />
+        <Stat label="Open" value={open.length} hint="Still to complete" />
+        <Stat label="Overdue" value={open.filter((u) => u.state === "overdue").length} tone={open.some((u) => u.state === "overdue") ? "red" : "good"} hint="Past the due date" />
+        <Stat label="With AICTE" value={open.filter((u) => u.state === "awaiting_verification").length} hint="Evidence being checked" />
       </Metrics>
 
       <div className="space-y-3">
@@ -85,11 +84,13 @@ export default function UndertakingsPage() {
           </article>
         )) : <Card><Empty title="No open undertakings.">Undertakings appear here when an approval is given with conditions.</Empty></Card>}
         {closed.length > 0 && (
-          <Card title="Closed undertakings" subtitle="Verified by AICTE" pad={false}>
-            <ul className="divide-y divide-line">
-              {closed.map((u) => <li key={u.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-[13.5px]"><span>{u.condition_text}</span><UndertakingState u={u} /></li>)}
-            </ul>
-          </Card>
+          <div className="surface px-4 py-2">
+            <Collapsible title={`Closed (${closed.length})`}>
+              <ul className="divide-y divide-line pb-1">
+                {closed.map((u) => <li key={u.id} className="flex items-center justify-between gap-3 py-2.5 text-[13.5px]"><span>{u.condition_text}</span><UndertakingState u={u} /></li>)}
+              </ul>
+            </Collapsible>
+          </div>
         )}
       </div>
       <NextStep href="/documents" label="documents and renewals" />

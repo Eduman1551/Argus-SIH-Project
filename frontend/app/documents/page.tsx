@@ -44,8 +44,8 @@ export default function DocumentsPage() {
   return (
     <div>
       <PageHeader crumbs={[{ label: "Institution", href: "/" }, { label: "Documents" }]} title="Documents"
-        description="Documents you must keep valid, such as the land lease. Upload the renewed document before it expires; AICTE verifies it." />
-      <HelpBox id="documents">Argus warns you 60, 30 and 7 days before expiry (illustrative settings). An expired document that is not renewed is escalated to AICTE officers.</HelpBox>
+        description="Documents you must keep valid. Upload the renewal before it expires." />
+      <HelpBox id="documents">Argus warns you before a document expires. An expired document is reported to AICTE.</HelpBox>
       <div className="grid gap-4 lg:grid-cols-2">
         {data.rows.map((d) => (
           <article key={d.id} className="surface enter flex flex-col p-4">

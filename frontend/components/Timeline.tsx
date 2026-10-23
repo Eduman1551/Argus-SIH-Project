@@ -32,10 +32,10 @@ function detailText(e: AuditEntry): string | null {
     case "committee.recommended": return `${s("recommendation").replaceAll("_", " ")}: ${s("remarks")}`;
     case "alert.fired": {
       const what = ENTITY_TEXT[s("item").split(":")[0]] ?? "item";
-      return `${s("kind") === "overdue" ? "Overdue alert" : `Reminder ${Math.abs(Number(d.offset_days))} day(s) before`}: ${what.toLowerCase()} due ${s("due_date")}, sent to ${s("recipients")} people`;
+      return `${s("kind") === "overdue" ? "Overdue" : `Reminder, ${Math.abs(Number(d.offset_days))} day(s) before`}: ${what.toLowerCase()} due ${s("due_date")}`;
     }
-    case "escalation.raised": return `Level ${s("level")} to ${s("escalated_to")}, ${s("offset_days")} days after due`;
-    case "document.uploaded": return `${s("filename")} v${s("version")} · SHA-256 ${s("sha256").slice(0, 10)}…`;
+    case "escalation.raised": return `Level ${s("level")}, to ${s("escalated_to")}`;
+    case "document.uploaded": return s("filename");
     default: return null;
   }
 }
@@ -75,9 +75,10 @@ function HashChip({ hash }: { hash: string }) {
   );
 }
 
-/** Vertical ledger of a case's audit events, newest first. New events highlight softly for a moment. */
-export default function Timeline({ entries, max = 16 }: { entries: AuditEntry[]; max?: number }) {
+/** Vertical ledger of a case's audit events, newest first. Click an event for its details and audit hash. */
+export default function Timeline({ entries, max = 12 }: { entries: AuditEntry[]; max?: number }) {
   const [all, setAll] = useState(false);
+  const [open, setOpen] = useState<number | null>(null);
   const seen = useRef<Set<number> | null>(null);
   const [fresh, setFresh] = useState<Set<number>>(new Set());
   useEffect(() => {
@@ -94,18 +95,26 @@ export default function Timeline({ entries, max = 16 }: { entries: AuditEntry[];
         <span className="absolute bottom-2 left-[107px] top-2 hidden w-px bg-line sm:block" aria-hidden />
         {shown.map((e) => {
           const detail = detailText(e);
+          const isOpen = open === e.id;
           return (
-            <li key={e.id} className={`relative grid grid-cols-1 gap-x-3 rounded-lg px-1 py-2 sm:grid-cols-[96px_22px_minmax(0,1fr)_auto] ${fresh.has(e.id) ? "flash" : ""}`}>
-              <time className="mono pt-0.5 text-[11.5px] text-ink-soft" dateTime={e.at} title={fmtDateTime(e.at)}>
-                {fmtDate(e.at).slice(0, 6)}<span className="block text-[10.5px]">{fmtDateTime(e.at).split(", ").pop()}</span>
-              </time>
-              <span className={`relative z-[1] hidden h-[22px] w-[22px] items-center justify-center rounded-full sm:flex ${tone(e.action)}`} aria-hidden>{iconFor(e.action)}</span>
-              <div className="min-w-0">
-                <div className="text-[13.5px] font-medium leading-snug text-ink">{ACTION_TEXT[e.action] ?? e.action}</div>
-                {detail && <div className="text-[13px] leading-snug text-ink">{detail}</div>}
-                <div className="mt-0.5 text-[12px] text-ink-soft">{e.actor_id == null ? "Argus automation" : e.actor_label}</div>
-              </div>
-              {e.hash && <div className="pt-0.5"><HashChip hash={e.hash} /></div>}
+            <li key={e.id} className={`relative rounded-lg ${fresh.has(e.id) ? "flash" : ""} ${isOpen ? "bg-surface-2" : ""}`}>
+              <button onClick={() => setOpen(isOpen ? null : e.id)} aria-expanded={isOpen}
+                className="grid w-full grid-cols-1 gap-x-3 rounded-lg px-1 py-2 text-left hover:bg-surface-2 sm:grid-cols-[96px_22px_minmax(0,1fr)]">
+                <time className="mono pt-0.5 text-[11.5px] text-ink-soft" dateTime={e.at}>{fmtDate(e.at).slice(0, 6)}</time>
+                <span className={`relative z-[1] hidden h-[22px] w-[22px] items-center justify-center rounded-full sm:flex ${tone(e.action)}`} aria-hidden>{iconFor(e.action)}</span>
+                <span className="min-w-0">
+                  <span className="block text-[13.5px] font-medium leading-snug text-ink">{ACTION_TEXT[e.action] ?? e.action}</span>
+                  {detail && <span className={`block text-[13px] leading-snug text-ink ${isOpen ? "" : "truncate"}`}>{detail}</span>}
+                  <span className="mt-0.5 block text-[12px] text-ink-soft">{e.actor_id == null ? "Argus" : e.actor_label.split(" (")[0]}</span>
+                </span>
+              </button>
+              {isOpen && (
+                <div className="enter flex flex-wrap items-center gap-x-4 gap-y-1 pb-2.5 pl-1 text-[12px] text-ink-soft sm:pl-[131px]">
+                  <span className="mono">{fmtDateTime(e.at)}</span>
+                  {e.actor_id != null && <span>{e.actor_label}</span>}
+                  {e.hash && <span className="flex items-center gap-1.5">Audit hash <HashChip hash={e.hash} /></span>}
+                </div>
+              )}
             </li>
           );
         })}

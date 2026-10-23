@@ -9,11 +9,11 @@ import { FileList, FilePicker, type FileRow } from "@/components/Files";
 import { UndertakingState } from "@/components/status";
 import Timeline, { type AuditEntry } from "@/components/Timeline";
 import {
-  Button, Callout, Card, DocLayout, DraftLabel, DueCell, ErrorNote, Field, KeyVal, Modal, NextStep, Owner, PageHeader, PageSkeleton,
+  Button, Callout, Card, Collapsible, DocLayout, DraftLabel, DueCell, ErrorNote, Field, KeyVal, Modal, NextStep, Owner, PageHeader, PageSkeleton,
   Section, SlaStamp, Stamp, Table,
 } from "@/components/ui";
 import { EscalationLadder, nextStep, rungsFor, useEscalationRules } from "@/components/viz/EscalationLadder";
-import { SlaBar, SlaLegend, rowSla, useReminderTicks } from "@/components/viz/SlaBar";
+import { SlaBar, SlaLegend, daysBetween, rowSla, useReminderTicks } from "@/components/viz/SlaBar";
 import { act, api, useApi } from "@/lib/api";
 import { addDays, dueText, fmtDate, fmtDateTime } from "@/lib/format";
 import { DECISION_TEXT, ENTITY_TEXT, RECOMMENDATION_TEXT, REPORT_OUTCOME_TEXT, STAGE_NAME, WAITING_TEXT } from "@/lib/labels";
@@ -91,7 +91,7 @@ export default function CaseView({ appId, mode = "case" }: { appId: number; mode
   return (
     <div>
       <PageHeader crumbs={crumbs} title={<span className="mono tracking-[-0.03em]">{a.ref_no}</span>}
-        description={<>{a.institution}, {a.city} · {a.programme} · {a.type_name} · <span className="mono">{a.academic_year}</span></>}
+        description={<>{a.institution} · {a.programme}</>}
         action={primaryAction(data, has, setModal)} />
 
       <RouteLine route={data.route} decided={a.status === "decided"} />
@@ -120,7 +120,7 @@ export default function CaseView({ appId, mode = "case" }: { appId: number; mode
               </Table>
             </Card>
           )}
-          <Card id="documents" title="Documents" subtitle="Every upload is versioned and fingerprinted (SHA-256)">
+          <Card id="documents" title="Documents">
             <FileList files={data.files} empty="No application documents yet." />
             {has("upload_document") && (
               <div className="mt-3 border-t border-line pt-3">
@@ -129,7 +129,7 @@ export default function CaseView({ appId, mode = "case" }: { appId: number; mode
               </div>
             )}
           </Card>
-          <Section id="timeline" title="Timeline" description="Every event on this case from the tamper-evident audit trail, newest first. The chip is the entry's hash.">
+          <Section id="timeline" title="Timeline" description="What happened on this case, newest first. Click an event for details.">
             <div className="surface p-3"><Timeline entries={data.timeline} /></div>
           </Section>
         </div>
@@ -176,12 +176,11 @@ function RouteLine({ route, decided }: { route: RouteStep[]; decided: boolean })
             </span>
             <div className={`mt-2 text-[13px] font-medium leading-tight ${active ? "text-brand-hover" : done ? "text-ink" : "text-ink-soft"}`}>{s.name}</div>
             <div className="mono mt-0.5 text-[11.5px] text-ink-soft">
-              {done && `${s.days}d${s.institution_days ? ` · ${s.institution_days}d inst.` : ""}${s.on_time === false ? " · late" : ""}`}
-              {active && `day ${s.days} · due ${fmtDate(s.due).slice(0, 6)}`}
+              {done && `${s.days} days${s.on_time === false ? " · late" : ""}`}
+              {active && `due ${fmtDate(s.due).slice(0, 6)}`}
               {s.state === "pending" && (decided ? "not needed" : "upcoming")}
               {s.state === "reverted" && "sent back"}
             </div>
-            {s.attempts > 1 && <div className="text-[11px] text-warn-ink">attempt {s.attempts}</div>}
           </li>
         );
       })}
@@ -241,13 +240,6 @@ function CurrentStage({ data, has, open }: { data: CaseDetail; has: (x: string) 
           <div className="mt-2"><SlaLegend /></div>
         </div>
       )}
-      {sla && (
-        <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-line pt-3 text-[12.5px]">
-          <div><dt className="text-ink-soft">Age</dt><dd className="mono font-medium">{sla.age_days} days</dd></div>
-          <div><dt className="text-ink-soft">With AICTE / committees</dt><dd className="mono font-medium">{sla.waiting_aicte_days} days</dd></div>
-          <div><dt className="text-ink-soft">With institution</dt><dd className="mono font-medium">{sla.waiting_institution_days} days</dd></div>
-        </dl>
-      )}
       {data.actions.some((x) => ["complete_review", "raise_deficiency", "reassign", "revert", "record_decision", "assign_members", "schedule_visit", "review_report", "assign_committee"].includes(x)) && (
         <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-3">
           {has("complete_review") && <Button kind="primary" small onClick={() => open("complete")}><CheckCircle2 size={14} /> Complete and move on</Button>}
@@ -274,18 +266,37 @@ function EscalationCard({ data }: { data: CaseDetail }) {
     groups.set(k, [...(groups.get(k) ?? []), al]);
   });
   return (
-    <Card id="escalation" title="Escalation" subtitle="Who was alerted at each level, and what happens next if the item stays open">
-      <div className="grid gap-5 md:grid-cols-2">
+    <Card id="escalation" title="Escalation" subtitle="Overdue items on this case are sent up the chain">
+      <ul className="space-y-2">
         {[...groups.entries()].slice(0, 4).map(([k, list]) => {
           const reached = Math.max(...list.map((l) => l.level ?? 0));
           const first = list[0];
+          const next = nextStep(first.entity_type, first.due_date, reached, rules);
+          const left = next && today ? daysBetween(today, next.date) : null;
           return (
-            <div key={k}>
-              <div className="mb-2 text-[12.5px] text-ink-soft">{ENTITY_TEXT[first.entity_type] ?? first.entity_type}, due <span className="mono">{fmtDate(first.due_date)}</span></div>
-              <EscalationLadder rungs={rungsFor(list, rules)} next={nextStep(first.entity_type, first.due_date, reached, rules)} today={today} />
-            </div>
+            <li key={k} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13.5px]">
+              <Stamp tone="escalated" level={reached} />
+              <span>{ENTITY_TEXT[first.entity_type] ?? first.entity_type}, due <span className="mono">{fmtDate(first.due_date)}</span></span>
+              <span className="text-ink-soft">{reached >= 3 ? "Top of the chain" : left != null ? `Next level ${left <= 0 ? "today" : `in ${left} days`}` : ""}</span>
+            </li>
           );
         })}
+      </ul>
+      <div className="mt-3 border-t border-line pt-2">
+        <Collapsible title="View details">
+          <div className="grid gap-5 md:grid-cols-2">
+            {[...groups.entries()].slice(0, 4).map(([k, list]) => {
+              const reached = Math.max(...list.map((l) => l.level ?? 0));
+              const first = list[0];
+              return (
+                <div key={k}>
+                  <div className="mb-2 text-[12.5px] text-ink-soft">{ENTITY_TEXT[first.entity_type] ?? first.entity_type}</div>
+                  <EscalationLadder rungs={rungsFor(list, rules)} next={nextStep(first.entity_type, first.due_date, reached, rules)} today={today} />
+                </div>
+              );
+            })}
+          </div>
+        </Collapsible>
       </div>
     </Card>
   );
@@ -294,7 +305,7 @@ function EscalationCard({ data }: { data: CaseDetail }) {
 /* ---------------------------------------------------------------- deficiencies */
 function DeficiencyCard({ defs, canRespond, open }: { defs: Deficiency[]; canRespond: boolean; open: (m: ModalKind) => void }) {
   return (
-    <Card id="deficiencies" title="Deficiencies and replies" subtitle="Each return records who raised it, why, and the reply">
+    <Card id="deficiencies" title="Deficiencies and replies">
       <ol className="space-y-3">
         {defs.map((d, i) => (
           <li key={d.id} className="rounded-xl border border-line bg-surface-2 p-3.5">
@@ -375,7 +386,7 @@ function CommitteeCard({ review, has, open, reload }: { review: Review; has: (x:
   const regen = async () => {
     setBusy(true);
     const r = await act<{ source: string }>(`/api/reviews/${review.id}/summary`, { use_llm: true });
-    if (r) useApp.getState().toast("info", r.source === "llm" ? "Summary redrafted with the AI helper. Please review it." : "AI helper not available; summary rebuilt from the offline template.");
+    if (r) useApp.getState().toast("info", r.source === "llm" ? "Summary redrafted with the AI helper. Please review it." : "Summary rebuilt from the case records.");
     setBusy(false);
     reload();
   };
@@ -385,7 +396,6 @@ function CommitteeCard({ review, has, open, reload }: { review: Review; has: (x:
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="text-[13px] font-medium">Electronic case summary</span>
         <DraftLabel />
-        <span className="text-[12px] text-ink-soft">{review.summary_source === "llm" ? "Drafted with the AI helper" : "Built from case records (offline template)"} · {fmtDateTime(review.summary_at)}</span>
         {has("regenerate_summary") && <Button small kind="ghost" busy={busy} onClick={regen}><RefreshCw size={13} /> Redraft</Button>}
       </div>
       <pre className="whitespace-pre-wrap rounded-xl border border-line bg-surface-2 p-4 font-sans text-[13.5px] leading-relaxed">{review.summary}</pre>

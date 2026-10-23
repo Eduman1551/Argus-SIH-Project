@@ -2,11 +2,11 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { FilePlus2, Search } from "lucide-react";
+import { FilePlus2, Search, SlidersHorizontal } from "lucide-react";
 import { CasePreview } from "@/components/case/CasePreview";
-import { SlaBar, rowSla, useReminderTicks, type StageWindow } from "@/components/viz/SlaBar";
+import { SlaBar, rowSla, type StageWindow } from "@/components/viz/SlaBar";
 import {
-  Button, Card, DueCell, Empty, ErrorNote, Field, FilterChips, HelpBox, Modal, NextStep, Owner, PageHeader, PageSkeleton,
+  Button, Card, DueCell, Empty, ErrorNote, Field, FilterChips, HelpBox, Modal, NextStep, PageHeader, PageSkeleton,
   SlaStamp, Stamp, Table, Tabs, useRowNav, type Chip,
 } from "@/components/ui";
 import { api, useApi } from "@/lib/api";
@@ -36,6 +36,7 @@ function ApplicationsInner() {
   const [qDebounced, setQD] = useState("");
   const [creating, setCreating] = useState(params.get("new") === "1");
   const [preview, setPreview] = useState<number | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
   useEffect(() => { const t = setTimeout(() => setQD(q), 300); return () => clearTimeout(t); }, [q]);
 
   const qs = useMemo(() => {
@@ -49,7 +50,6 @@ function ApplicationsInner() {
   }, [status, sla, stage, region, qDebounced]);
   const { data, error, loading, reload } = useApi<{ rows: Row[]; total: number }>(`/api/applications?${qs}`);
   const regions = useApi<{ id: number; name: string }[]>(!inst ? "/api/regions" : null);
-  const ticks = useReminderTicks();
   const rows = data?.rows ?? [];
   const open = useCallback((i: number) => setPreview(rows[i]?.id ?? null), [rows]);
   const rowProps = useRowNav(rows.length, open);
@@ -65,11 +65,11 @@ function ApplicationsInner() {
     <div>
       <PageHeader crumbs={inst ? [{ label: "Institution", href: "/" }, { label: "Applications" }] : [{ label: "Cases" }, { label: "Applications" }]}
         title={inst ? "My applications" : "Applications"}
-        description={inst ? "Every application your institution has submitted, where it is now, and what it is waiting for." : "Find any case by Region, stage or deadline. Click a row (or press Enter) for a quick look."}
+        description={inst ? "Where each of your applications is now." : "Find any case. Click a row for a quick look."}
         action={inst ? <Button kind="primary" onClick={() => setCreating(true)}><FilePlus2 size={15} /> New application</Button> : undefined} />
       <HelpBox id={inst ? "apps-inst" : "apps-official"}>
-        {inst ? "Submit a new application with the button on the right. Argus picks the route for its type and sends it to an officer automatically."
-          : "Narrow the list with the filters; each one appears as a chip you can remove. The bar in each row is the time used in the current stage against its limit."}
+        {inst ? "Use New application to apply. Argus sends it to the right officer for you."
+          : "Search or use Filters. The bar shows how much of the time limit is used."}
       </HelpBox>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -81,6 +81,10 @@ function ApplicationsInner() {
           <Tabs value={status || "all"} onChange={(v) => setStatus(v === "all" ? "" : v)}
             tabs={[{ id: "all", label: "All" }, { id: "in_progress", label: "In progress" }, { id: "decided", label: "Decided" }]} />
         </div>
+        <Button onClick={() => setShowFilters(!showFilters)}><SlidersHorizontal size={14} /> Filters{chips.filter((c) => c.key !== "q").length ? <span className="mono ml-0.5 rounded-full bg-brand px-1.5 text-[11px] text-white">{chips.filter((c) => c.key !== "q").length}</span> : null}</Button>
+      </div>
+      {showFilters && (
+      <div className="enter mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-2.5">
         <select className="field w-auto" value={sla} onChange={(e) => setSla(e.target.value)} aria-label="Deadline status">
           <option value="">Any deadline</option><option value="overdue">Overdue</option><option value="due_soon">Due soon</option><option value="on_track">On track</option>
         </select>
@@ -93,28 +97,23 @@ function ApplicationsInner() {
           </select>
         )}
       </div>
+      )}
       <FilterChips chips={chips} onClear={() => { setSla(""); setStage(""); setRegion(""); setQ(""); setQD(""); }} />
 
       {loading ? <PageSkeleton /> : error ? <ErrorNote error={error} onRetry={reload} /> : (
         <Card title={<span><span className="mono">{data!.total}</span> application{data!.total === 1 ? "" : "s"}</span>}
-          subtitle="Arrow keys move between rows; Enter opens a quick look" pad={false}>
+          subtitle="Click a row for details" pad={false}>
           {rows.length ? (
-            <Table minWidth={inst ? 900 : 1080} maxHeight={640}>
-              <thead><tr>
-                <th>Reference</th>{!inst && <th>Institution</th>}<th>Stage</th><th style={{ width: 150 }}>Time limit</th>
-                <th>With</th><th className="num">Age</th><th>Next due</th><th>Status</th>
-              </tr></thead>
+            <Table minWidth={820} maxHeight={640}>
+              <thead><tr><th>Case</th><th>Stage</th><th style={{ width: 160 }}>Time used</th><th>Due</th><th>Status</th></tr></thead>
               <tbody>
                 {rows.map((r, i) => {
                   const bar = today && r.status === "in_progress" ? rowSla(r, today) : null;
                   return (
                     <tr key={r.id} {...rowProps(i)} aria-label={`Preview ${r.ref_no}`}>
-                      <td><span className="mono font-medium text-brand">{r.ref_no}</span><div className="max-w-[200px] truncate text-[12px] text-ink-soft">{r.programme}</div></td>
-                      {!inst && <td><div className="max-w-[220px] truncate">{r.institution}</div><div className="text-[12px] text-ink-soft">{r.region} · {r.type_name}</div></td>}
+                      <td><span className="mono font-medium text-brand">{r.ref_no}</span><div className="max-w-[280px] truncate text-[12px] text-ink-soft">{inst ? r.programme : r.institution}</div></td>
                       <td>{r.status === "decided" ? DECISION_TEXT[r.decision ?? ""] : <>{r.stage_name}<div className="text-[12px] text-ink-soft">{r.substatus_text}</div></>}</td>
-                      <td>{bar ? <SlaBar {...bar} ticks={ticks.stage} compact /> : <span className="text-ink-soft">–</span>}</td>
-                      <td className="max-w-[160px]">{r.waiting_on === "institution" ? <span className="text-ink-soft">Institution</span> : <Owner name={r.assignee} />}</td>
-                      <td className="num mono">{r.age_days ?? "–"}</td>
+                      <td>{bar ? <SlaBar {...bar} compact /> : <span className="text-ink-soft">–</span>}</td>
                       <td><DueCell date={r.due_date} days={r.days_to_due} fmt={fmtDate} /></td>
                       <td>{r.status === "decided" ? <Stamp tone="closed">Decided</Stamp> : <SlaStamp status={r.sla_status} days={r.days_to_due} level={r.escalation_level} waitingOn={r.waiting_on} solid />}</td>
                     </tr>
@@ -127,7 +126,7 @@ function ApplicationsInner() {
       )}
       {creating && <NewApplication close={() => setCreating(false)} />}
       <CasePreview appId={preview} onClose={() => setPreview(null)} />
-      <NextStep href={inst ? "/undertakings" : "/evc"} label={inst ? "undertakings" : "EVC scheduling board"} />
+      <NextStep href={inst ? "/undertakings" : "/evc"} label={inst ? "undertakings" : "expert visits"} />
     </div>
   );
 }
@@ -172,7 +171,7 @@ function NewApplication({ close }: { close: () => void }) {
               </li>
             ))}
           </ol>
-          <div className="mt-2 text-[12px] text-ink-soft">Routes come from the Rules page (illustrative, not official APH).</div>
+          
         </div>
       )}
       <Field label="Programme or proposal" hint="For example: B.Tech Computer Science and Engineering (60 seats)">

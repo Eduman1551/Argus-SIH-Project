@@ -21,7 +21,7 @@ export function FileList({ files, empty = "No files yet." }: { files: FileRow[];
           <div className="min-w-0 flex-1">
             <div className="truncate font-medium">{f.filename} <span className="text-ink-soft">· v{f.version}</span></div>
             <div className="truncate text-[12px] text-ink-soft" title={`SHA-256 ${f.sha256}`}>
-              {bytes(f.size_bytes)} · {fmtDate(f.uploaded_at)}{f.uploaded_by ? ` · ${f.uploaded_by}` : ""} · SHA-256 {f.sha256.slice(0, 12)}…
+              {bytes(f.size_bytes)} · {fmtDate(f.uploaded_at)}{f.uploaded_by ? ` · ${f.uploaded_by}` : ""}
             </div>
           </div>
           <a href={`/api/files/${f.id}`} className="inline-flex items-center gap-1 rounded border border-line px-2 py-1 text-[12.5px] no-underline hover:border-brand" download>

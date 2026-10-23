@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { CalendarDays, ClipboardCheck, FileClock, FilePlus2, MessageSquareWarning } from "lucide-react";
 import { CasePreview } from "@/components/case/CasePreview";
-import { DocState, UndertakingState } from "@/components/status";
 import { HeatCalendar, type CalEvent } from "@/components/viz/HeatCalendar";
 import { SlaBar, rowSla, type StageWindow } from "@/components/viz/SlaBar";
 import {
@@ -60,16 +59,15 @@ export default function InstitutionHome() {
   return (
     <div>
       <PageHeader crumbs={[{ label: "Institution" }, { label: "Home" }]} title={user.institution_name ?? "My institution"}
-        description="Your applications, what you need to do next, and every deadline Argus is watching for you."
+        description="Your applications and what to do next."
         action={<LinkButton kind="primary" href="/applications?new=1"><FilePlus2 size={15} /> New application</LinkButton>} />
       <HelpBox id="inst-home">
-        Work through <b>What needs you</b> from the top: it is sorted by due date. Argus reminds you before each deadline and,
-        if one passes, the item is escalated to AICTE officers.
+        Start at the top of <b>What needs you</b>. Argus reminds you before each deadline.
       </HelpBox>
 
       <Metrics>
-        <Stat label="Applications in progress" value={data.counts.in_progress} hint={`${data.counts.applications} in total`} href="/applications" />
-        <Stat label="Waiting on you" value={data.counts.actions} tone={data.counts.actions ? "warn" : "good"} hint="Actions with a due date" />
+        <Stat label="In progress" value={data.counts.in_progress} hint={`${data.counts.applications} applications in total`} href="/applications" />
+        <Stat label="Waiting on you" value={data.counts.actions} tone={data.counts.actions ? "warn" : "good"} hint="Things to do" />
         <Stat label="Overdue" value={data.counts.overdue_actions} tone={data.counts.overdue_actions ? "red" : "good"} hint="Past their due date" />
         <Stat label="Documents to renew" value={data.documents_attention.filter((d) => d.state !== "renewal_submitted").length}
           tone={data.documents_attention.some((d) => d.state === "expired") ? "red" : "ink"} hint="Expired or expiring soon" href="/documents" />
@@ -112,16 +110,15 @@ export default function InstitutionHome() {
         </Card>
       </div>
 
-      <Card title="My applications" subtitle="Click a row for a quick look; the bar shows time used in the current stage" pad={false} className="mb-6">
+      <Card title="My applications" subtitle="Click a row for details" pad={false} className="mb-6">
         <Table minWidth={860}>
-          <thead><tr><th>Reference</th><th>Type</th><th>Current stage</th><th style={{ width: 170 }}>Time limit</th><th>Next due</th><th>Status</th></tr></thead>
+          <thead><tr><th>Application</th><th>Stage</th><th style={{ width: 160 }}>Time used</th><th>Due</th><th>Status</th></tr></thead>
           <tbody>
             {apps.map((a, i) => {
               const sla = today ? rowSla(a, today) : null;
               return (
                 <tr key={a.id} {...rowProps(i)} aria-label={`Preview ${a.ref_no}`}>
                   <td><span className="mono font-medium text-brand">{a.ref_no}</span><div className="max-w-[220px] truncate text-[12px] text-ink-soft">{a.programme}</div></td>
-                  <td className="max-w-[180px]">{a.type_name}</td>
                   <td>{a.status === "decided" ? DECISION_TEXT[a.decision ?? ""] : <>{a.stage_name}<div className="text-[12px] text-ink-soft">{a.substatus_text}</div></>}</td>
                   <td>{sla ? <SlaBar {...sla} compact /> : <span className="text-ink-soft">–</span>}</td>
                   <td><DueCell date={a.due_date} days={a.days_to_due} fmt={fmtDate} /></td>
@@ -133,39 +130,6 @@ export default function InstitutionHome() {
         </Table>
       </Card>
 
-      <div className="grid gap-5 xl:grid-cols-2">
-        <Card title="Open undertakings" subtitle="Time-bound conditions from your approvals" action={<LinkButton small href="/undertakings">All undertakings</LinkButton>} pad={false}>
-          {data.undertakings.length ? (
-            <Table>
-              <thead><tr><th>Condition</th><th>Due</th><th>State</th></tr></thead>
-              <tbody>
-                {data.undertakings.slice(0, 6).map((u) => (
-                  <tr key={u.id}><td className="max-w-[320px]">{u.condition_text}<div className="mono text-[11.5px] text-ink-soft">{u.ref_no}</div></td>
-                    <td><DueCell date={u.due_date} days={u.days_to_due} fmt={fmtDate} /></td><td><UndertakingState u={u} solid /></td></tr>
-                ))}
-              </tbody>
-            </Table>
-          ) : <Empty title="No open undertakings." />}
-        </Card>
-        <Card title="Documents to watch" subtitle="Leases and other tracked documents" action={<LinkButton small href="/documents">All documents</LinkButton>} pad={false}>
-          {data.documents_attention.length ? (
-            <Table>
-              <thead><tr><th>Document</th><th>Expires</th><th>State</th></tr></thead>
-              <tbody>
-                {data.documents_attention.map((d) => (
-                  <tr key={d.id}><td>{d.title}<div className="text-[11.5px] text-ink-soft">{d.issued_by}</div></td>
-                    <td><DueCell date={d.expires_on} days={d.days_to_expiry} fmt={fmtDate} /></td><td><DocState state={d.state} level={d.escalation_level} /></td></tr>
-                ))}
-              </tbody>
-            </Table>
-          ) : <Empty title="All documents are valid." />}
-          {data.evidence_waiting.length > 0 && (
-            <div className="border-t border-line px-4 py-2.5 text-[12.5px] text-ink-soft">
-              {data.evidence_waiting.length} evidence submission(s) are waiting for AICTE verification.
-            </div>
-          )}
-        </Card>
-      </div>
       <CasePreview appId={preview} onClose={() => setPreview(null)} />
       <NextStep href="/undertakings" label="upload evidence for undertakings" />
     </div>
