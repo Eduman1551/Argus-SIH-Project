@@ -39,6 +39,6 @@ def get_settings() -> Settings:
         database_url=os.environ.get("DATABASE_URL", ""),
         session_secret=os.environ.get("SESSION_SECRET", "argus-dev-only-secret"),
         groq_api_key=os.environ.get("GROQ_API_KEY", ""),
-        llm_model=os.environ.get("LLM_MODEL", "") or "llama-3.3-70b-versatile",
+        llm_model=os.environ.get("LLM_MODEL", "") or "openai/gpt-oss-20b",
         cron_secret=os.environ.get("CRON_SECRET", ""),
     )

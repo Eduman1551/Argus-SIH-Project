@@ -17,7 +17,8 @@ DRAFT_LABEL = "Draft, to be reviewed by the officer"
 _SYSTEM = (
     "You draft neutral administrative text for officers of a technical-education regulator. "
     "Use only the facts given. Do not invent facts. Never recommend, approve, reject, grant or deny anything; "
-    "decisions are taken by the competent human authority. Plain English, short paragraphs and bullet points."
+    "decisions are taken by the competent human authority. Plain English, short paragraphs and '-' bullet points. "
+    "Plain text only: no Markdown, no bold, no headings with # or *."
 )
 
 
@@ -25,23 +26,31 @@ def llm_available() -> bool:
     return bool(get_settings().groq_api_key)
 
 
-def _complete(prompt: str, max_tokens: int = 700) -> str | None:
+def _complete(prompt: str, max_tokens: int = 1500) -> str | None:
     s = get_settings()
     if not s.groq_api_key:
         return None
     try:
-        from groq import Groq
+        from groq import BadRequestError, Groq
 
-        client = Groq(api_key=s.groq_api_key, timeout=12.0, max_retries=0)
-        resp = client.chat.completions.create(
-            model=s.llm_model,
-            messages=[{"role": "system", "content": _SYSTEM}, {"role": "user", "content": prompt}],
-            temperature=0.2,
-            max_tokens=max_tokens,
-        )
-        text = (resp.choices[0].message.content or "").strip()
+        client = Groq(api_key=s.groq_api_key, timeout=15.0, max_retries=0)
+        args = {
+            "model": s.llm_model,
+            "messages": [{"role": "system", "content": _SYSTEM}, {"role": "user", "content": prompt}],
+            "temperature": 0.2,
+            "max_tokens": max_tokens,
+        }
+        try:
+            # reasoning models (for example openai/gpt-oss-*) otherwise spend the budget thinking
+            resp = client.chat.completions.create(**args, reasoning_effort="low")
+        except BadRequestError:
+            resp = client.chat.completions.create(**args)  # model without a reasoning setting
+        choice = resp.choices[0]
+        text = (choice.message.content or "").strip()
+        if not text:
+            log.warning("LLM returned no text (finish reason %s), using template", choice.finish_reason)
         return text or None
-    except Exception as exc:  # network, quota, bad model: fall back to the template
+    except Exception as exc:  # network, quota, unknown model: fall back to the template
         log.warning("LLM draft failed, using template: %s", type(exc).__name__)
         return None
 
@@ -139,7 +148,6 @@ def draft_letter(kind: str, facts: dict, use_llm: bool = False) -> tuple[str, st
         text = _complete(
             "Improve the wording of this formal letter draft. Keep it short and polite, keep all facts, dates and "
             "the first line unchanged, and do not add any decision.\n\n" + base,
-            max_tokens=600,
         )
         if text:
             return text, "llm"
