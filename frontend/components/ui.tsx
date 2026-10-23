@@ -48,7 +48,7 @@ export function Card({ title, subtitle, children, className = "", action, pad = 
             {title && <h2 className="text-[15.5px] font-semibold leading-snug">{title}</h2>}
             {subtitle && <p className="mt-0.5 text-[12.5px] text-ink-soft">{subtitle}</p>}
           </div>
-          {action}
+          {action && <div className="shrink-0">{action}</div>}
         </div>
       )}
       <div className={pad ? "p-4" : ""}>{children}</div>
@@ -515,11 +515,13 @@ export function DraftLabel() {
 }
 
 /** Segmented tabs with a sliding indicator. */
-export function Tabs({ tabs, value, onChange }: { tabs: { id: string; label: ReactNode }[]; value: string; onChange: (id: string) => void }) {
+export function Tabs({ tabs, value, onChange, className = "mb-4" }: {
+  tabs: { id: string; label: ReactNode }[]; value: string; onChange: (id: string) => void; className?: string;
+}) {
   const reduce = useReducedMotion();
   const uid = useId();
   return (
-    <div role="tablist" className="mb-4 inline-flex max-w-full flex-wrap gap-0.5 rounded-xl border border-line bg-surface-2 p-1">
+    <div role="tablist" className={`inline-flex max-w-full flex-wrap gap-0.5 rounded-xl border border-line bg-surface-2 p-1 ${className}`}>
       {tabs.map((t) => (
         <button key={t.id} role="tab" aria-selected={value === t.id} onClick={() => onChange(t.id)}
           className={`relative rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${value === t.id ? "text-ink" : "text-ink-soft hover:text-ink"}`}>
