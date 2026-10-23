@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import threading
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -9,13 +11,17 @@ from typing import Any
 
 import psycopg
 from psycopg.rows import dict_row
-from psycopg_pool import ConnectionPool
 
 from app.config import get_settings
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 
-_pool: ConnectionPool | None = None
+# A tiny cache of idle connections, so polling does not reconnect every 3 seconds.
+# No background threads and nothing that matters: losing it only costs a reconnect.
+_IDLE_MAX = 3
+_IDLE_SECONDS = 30.0
+_idle: list[tuple[float, psycopg.Connection]] = []
+_lock = threading.Lock()
 
 
 class DatabaseNotConfigured(RuntimeError):
@@ -29,33 +35,42 @@ def _url() -> str:
     return url
 
 
-def pool() -> ConnectionPool:
-    # A small pool per process. On serverless each instance keeps at most a few connections;
-    # nothing that matters lives here, it is only a cache of open sockets.
-    global _pool
-    if _pool is None:
-        _pool = ConnectionPool(
-            _url(),
-            min_size=0,
-            max_size=4,
-            kwargs={"row_factory": dict_row, "autocommit": False, "prepare_threshold": None},
-            check=ConnectionPool.check_connection,
-            open=True,
-        )
-    return _pool
+def _checkout() -> psycopg.Connection:
+    now = time.monotonic()
+    with _lock:
+        while _idle:
+            used, raw = _idle.pop()
+            if now - used < _IDLE_SECONDS and not raw.closed:
+                return raw
+            raw.close()
+    return connect()
+
+
+def _checkin(raw: psycopg.Connection) -> None:
+    if raw.closed or raw.info.transaction_status != psycopg.pq.TransactionStatus.IDLE:
+        raw.close()
+        return
+    with _lock:
+        if len(_idle) < _IDLE_MAX:
+            _idle.append((time.monotonic(), raw))
+            return
+    raw.close()
 
 
 @contextmanager
 def transaction() -> Iterator[Conn]:
     """Yield a Conn inside one transaction. Commits on success, rolls back on error."""
-    with pool().connection() as raw:
-        conn = Conn(raw)
-        try:
-            yield conn
-            raw.commit()
-        except BaseException:
+    raw = _checkout()
+    conn = Conn(raw)
+    try:
+        yield conn
+        raw.commit()
+    except BaseException:
+        if not raw.closed:
             raw.rollback()
-            raise
+        raise
+    finally:
+        _checkin(raw)
 
 
 def connect() -> psycopg.Connection:
