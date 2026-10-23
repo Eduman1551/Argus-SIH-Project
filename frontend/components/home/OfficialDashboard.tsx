@@ -78,7 +78,7 @@ export default function OfficialDashboard() {
           <StageBars data={data.by_stage} />
           {data.bottleneck && data.bottleneck.cases > 0 && (
             <div className="mt-2 flex items-center gap-2 rounded-md bg-brand-tint/60 px-3 py-2 text-[13.5px] text-brand-deep">
-              <AlertTriangle size={15} /> Bottleneck: <b>{data.bottleneck.name}</b>, {data.bottleneck.overdue} overdue, average {data.bottleneck.avg_days_in_stage} days in stage.
+              <AlertTriangle size={15} /> <span>Bottleneck: <b>{data.bottleneck.name}</b>{`, ${data.bottleneck.overdue} overdue, average ${data.bottleneck.avg_days_in_stage} days in stage.`}</span>
             </div>
           )}
         </Card>
