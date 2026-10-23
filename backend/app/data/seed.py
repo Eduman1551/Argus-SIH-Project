@@ -334,8 +334,8 @@ class Sim:
                                     filename="evc-visit-report.pdf", content_type="application/pdf",
                                     data=self.pdf("EVC visit report", app["ref_no"]),
                                     institution_id=app["institution_id"], application_id=app["id"])
-                scheduling.submit_report(c, now, convenor, v["id"], self.rng.choice(P.FINDINGS), e.report_outcome,
-                                         f["id"])
+                findings = P.FINDINGS[e.report_outcome][self.rng.randrange(4)]
+                scheduling.submit_report(c, now, convenor, v["id"], findings, e.report_outcome, f["id"])
         elif v["status"] == "report_submitted":
             if e.review is not None and since >= e.review:
                 scheduling.review_report(c, now, officer, v["id"], "Visit report reviewed and placed on record.")

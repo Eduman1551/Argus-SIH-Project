@@ -99,12 +99,26 @@ REPLIES = [
     "The required certificate is uploaded. The earlier copy was an older version.",
     "Clear signed copy uploaded along with a covering letter from the Principal.",
 ]
-FINDINGS = [
-    "Infrastructure, laboratories and library are available as claimed. Faculty present matched the submitted list.",
-    "Classrooms and laboratories are adequate. Two laboratories need additional equipment as per the norms.",
-    "Built-up area matches the sanctioned plan. Hostel facilities are under construction and not yet usable.",
-    "All facilities verified. Computer centre and internet bandwidth meet the requirement.",
-]
+FINDINGS = {
+    "satisfactory": [
+        "Infrastructure, laboratories and library are available as claimed. Faculty present matched the submitted list.",
+        "All facilities verified. Computer centre and internet bandwidth meet the requirement.",
+        "Built-up area matches the sanctioned plan. Laboratories, library and hostel are in use.",
+        "Classrooms, laboratories and amenities are adequate for the proposed intake.",
+    ],
+    "deficiencies_noted": [
+        "Classrooms and laboratories are adequate. Two laboratories need additional equipment as per the norms.",
+        "Built-up area matches the sanctioned plan. Hostel facilities are under construction and not yet usable.",
+        "Library holds fewer titles than required for the new course. Faculty present matched the list.",
+        "Fire exits in the new block are not marked. Other facilities are as claimed.",
+    ],
+    "not_satisfactory": [
+        "Several laboratories listed in the application were not available at the time of the visit.",
+        "The campus land in use does not match the documents submitted. Teaching blocks are incomplete.",
+        "Faculty present were far fewer than listed. Most laboratories were not equipped.",
+        "The building shown in the application was not in use as an academic block.",
+    ],
+}
 DECISION_REASONS = {
     "approved": "All stages completed and requirements found satisfactory on the records placed before the authority.",
     "approved_with_undertakings": "Requirements largely met. Approval granted subject to the listed time-bound undertakings.",
