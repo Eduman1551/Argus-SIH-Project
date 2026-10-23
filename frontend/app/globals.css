@@ -1,178 +1,252 @@
 @import "tailwindcss";
 
-/* Argus theme: red and light-brown paper (light only). */
+/*
+  Argus theme: "stone and pine". Light only, calm and precise.
+  Contrast (WCAG AA, checked): brand on stone 6.9:1, white on brand 7.6:1, brand on brand-tint 6.6:1,
+  ink-soft on stone 5.1:1. The amber (#B7791F) and red (#C0392B) are used for dots, bars and fills;
+  small text on their tints uses the darker *-ink shades (amber-ink 5.2:1, red-ink 5.4:1).
+  White on solid red (OVERDUE in tables) is 5.4:1.
+*/
 :root {
-  --paper: #f3e9d8;
-  --paper-2: #eadcc3;
-  --card: #fbf6ec;
-  --ink: #3b2a1e;
-  --ink-soft: #6b5744;
-  --line: #d6c3a3;
-  --red: #b3262d;
-  --red-deep: #7e1b22;
-  --red-tint: #f6ddd8;
-  /* status colours; the *-ink variants are darker so small text keeps WCAG AA on paper */
-  --olive: #5b7b3a;
-  --olive-ink: #4a6830;
-  --olive-tint: #e4ead3;
-  --ochre: #b7791f;
-  --ochre-ink: #8a5a12;
-  --ochre-tint: #f5e4c3;
-  --shadow-sheet: 0 1px 0 rgba(59, 42, 30, 0.04), 0 2px 6px -2px rgba(90, 60, 30, 0.14);
+  --bg: #f6f5f1;
+  --surface: #ffffff;
+  --surface-2: #faf9f6;
+  --line: #e4e2da;
+  --line-strong: #d3d0c5;
+  --ink: #17201f;
+  --ink-soft: #5f6b68;
+  --brand: #0f5e5a;
+  --brand-hover: #0b4a47;
+  --brand-tint: #e6f2f0;
+  --amber: #b7791f;
+  --amber-ink: #8a5a12;
+  --amber-tint: #fbf0da;
+  --red: #c0392b;
+  --red-ink: #a93226;
+  --red-tint: #fbe4e0;
+  --maroon: #7a1f1a;
+  --maroon-tint: #f4e4e2;
+  --slate: #6b7775;
+  --shadow-sm: 0 1px 2px rgba(23, 32, 31, 0.04);
+  --shadow-md: 0 1px 2px rgba(23, 32, 31, 0.04), 0 8px 24px -12px rgba(23, 32, 31, 0.12);
+  --shadow-float: 0 1px 2px rgba(23, 32, 31, 0.05), 0 18px 40px -18px rgba(23, 32, 31, 0.22);
+  --ring: 0 0 0 3px rgba(15, 94, 90, 0.18);
 }
 
 @theme inline {
-  --color-paper: var(--paper);
-  --color-paper-2: var(--paper-2);
-  --color-card: var(--card);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-ink: var(--ink);
   --color-ink-soft: var(--ink-soft);
-  --color-line: var(--line);
-  --color-brand: var(--red);
-  --color-brand-deep: var(--red-deep);
-  --color-brand-tint: var(--red-tint);
-  --color-olive: var(--olive);
-  --color-olive-ink: var(--olive-ink);
-  --color-olive-tint: var(--olive-tint);
-  --color-ochre: var(--ochre);
-  --color-ochre-ink: var(--ochre-ink);
-  --color-ochre-tint: var(--ochre-tint);
-  --font-serif: var(--font-serif-face), "Source Serif 4", Georgia, serif;
-  --font-sans: var(--font-sans-face), "Inter", system-ui, sans-serif;
-  --shadow-sheet: var(--shadow-sheet);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-tint: var(--brand-tint);
+  --color-warn: var(--amber);
+  --color-warn-ink: var(--amber-ink);
+  --color-warn-tint: var(--amber-tint);
+  --color-danger: var(--red);
+  --color-danger-ink: var(--red-ink);
+  --color-danger-tint: var(--red-tint);
+  --color-esc: var(--maroon);
+  --color-esc-tint: var(--maroon-tint);
+  --color-muted: var(--slate);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", monospace;
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-float: var(--shadow-float);
+  --radius-card: 12px;
+  /* TEMPORARY aliases for pages not yet migrated to the new tokens (removed in the polish step) */
+  --color-paper: var(--bg);
+  --color-paper-2: var(--surface-2);
+  --color-card: var(--surface);
+  --color-brand-deep: var(--brand-hover);
+  --color-olive: var(--brand);
+  --color-olive-ink: var(--brand);
+  --color-olive-tint: var(--brand-tint);
+  --color-ochre: var(--amber);
+  --color-ochre-ink: var(--amber-ink);
+  --color-ochre-tint: var(--amber-tint);
+  --font-serif: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Base element styles live in the base layer so Tailwind utilities can override them. */
+/* TEMPORARY class aliases (removed in the polish step) */
+@layer components {
+  .sheet { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-sm); }
+  .settle { animation: enter 220ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .input { width: 100%; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 8px; padding: 7px 10px; font-size: 14px; color: var(--ink); }
+  .input:focus { outline: none; border-color: var(--brand); box-shadow: var(--ring); }
+  textarea.input { min-height: 84px; resize: vertical; }
+  .ledger { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13.5px; }
+  .ledger thead th { background: var(--surface-2); color: var(--ink-soft); font-weight: 500; font-size: 12px; text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  .ledger tbody td { padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  .stamp { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 500; background: var(--surface-2); }
+}
+
 @layer base {
-html {
-  color-scheme: light;
-  background: var(--paper);
-}
-
-body {
-  background-color: var(--paper);
-  color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: 15px;
-  line-height: 1.55;
-  -webkit-font-smoothing: antialiased;
-  /* very subtle paper grain: tiny inline SVG noise at low opacity */
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35  0 0 0 0 0.24  0 0 0 0 0.12  0 0 0 0.07 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-}
-
-h1, h2, h3, .font-serif {
-  font-family: var(--font-serif);
-  letter-spacing: -0.005em;
-}
-
-::selection {
-  background: var(--red-tint);
-  color: var(--red-deep);
-}
-
-/* visible red keyboard focus everywhere */
-:focus-visible {
-  outline: 2px solid var(--red);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-
-a {
-  color: var(--red);
-  text-underline-offset: 3px;
-}
-a:hover {
-  color: var(--red-deep);
-}
+  html {
+    color-scheme: light;
+    background: var(--bg);
+  }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 14.5px;
+    line-height: 1.55;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  h1, h2, h3 {
+    color: var(--ink);
+    letter-spacing: -0.015em;
+  }
+  ::selection {
+    background: var(--brand-tint);
+    color: var(--brand-hover);
+  }
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--ring);
+    border-radius: 6px;
+  }
+  a {
+    color: var(--brand);
+    text-underline-offset: 3px;
+  }
+  a:hover {
+    color: var(--brand-hover);
+  }
+  code, kbd, samp {
+    font-family: var(--font-mono);
+  }
 }
 
 @layer components {
-/* ----- sheets ----- */
-.sheet {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: var(--shadow-sheet);
-}
+  /* surfaces */
+  .surface {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: var(--shadow-sm);
+  }
+  .mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
 
-/* ----- ledger tables ----- */
-.ledger {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  font-size: 14px;
-}
-.ledger thead th {
-  background: var(--paper-2);
-  color: var(--ink);
-  font-weight: 600;
-  font-size: 12.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  text-align: left;
-  padding: 9px 12px;
-  border-bottom: 1px solid var(--line);
-  white-space: nowrap;
-}
-.ledger thead th:first-child { border-top-left-radius: 7px; }
-.ledger thead th:last-child { border-top-right-radius: 7px; }
-.ledger tbody td {
-  padding: 9px 12px;
-  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
-  vertical-align: top;
-}
-.ledger tbody tr:last-child td { border-bottom: 0; }
-.ledger tbody tr.row-link { cursor: pointer; }
-.ledger tbody tr:hover td { background: color-mix(in srgb, var(--paper-2) 45%, transparent); }
-.ledger tbody tr.selected td { background: var(--red-tint); }
-.ledger .num { text-align: right; font-variant-numeric: tabular-nums; }
+  /* glass: only the navbar and floating menus use it */
+  .glass {
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-float);
+  }
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass {
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(14px) saturate(140%);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
+    }
+    .glass-strong {
+      background: rgba(255, 255, 255, 0.88);
+    }
+  }
 
-/* ----- rubber-stamp status badges ----- */
-.stamp {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 7px;
-  border: 1.5px solid currentColor;
-  border-radius: 3px;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 18px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 18%, transparent);
-  background: color-mix(in srgb, var(--card) 70%, transparent);
-}
-.stamp-solid {
-  background: var(--red);
-  border-color: var(--red);
-  color: #fff;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
-}
-.stamp-deep {
-  background: var(--red-deep);
-  border-color: var(--red-deep);
-  color: #fff;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
-}
+  /* page header wash: a faint brand tint behind the header only */
+  .header-wash {
+    background: radial-gradient(1200px 160px at 20% 0%, rgba(15, 94, 90, 0.07), transparent 70%),
+      linear-gradient(180deg, rgba(230, 242, 240, 0.55), rgba(246, 245, 241, 0));
+  }
 
-/* ----- motion: transform only after mount, never start hidden ----- */
-@keyframes settle {
-  from { transform: translateY(5px); }
-  to { transform: translateY(0); }
+  /* tables */
+  .data-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 13.5px;
+  }
+  .data-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--surface-2);
+    color: var(--ink-soft);
+    font-weight: 500;
+    font-size: 12px;
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  .data-table tbody td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+  }
+  .data-table tbody tr:last-child td { border-bottom: 0; }
+  .data-table tbody tr { transition: background-color 120ms ease; }
+  .data-table tbody tr:hover td { background: var(--surface-2); }
+  .data-table tbody tr.is-link { cursor: pointer; }
+  .data-table tbody tr.is-active td { background: var(--brand-tint); }
+  .data-table tbody tr:focus-visible { outline: none; box-shadow: none; }
+  .data-table tbody tr:focus-visible td { background: var(--brand-tint); }
+  .data-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* inputs */
+  .field {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 14px;
+    color: var(--ink);
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+  }
+  .field::placeholder { color: #8a9492; }
+  .field:hover { border-color: #bfbcb0; }
+  .field:focus { outline: none; border-color: var(--brand); box-shadow: var(--ring); }
+  textarea.field { min-height: 84px; resize: vertical; }
+  select.field { padding-right: 28px; }
+
+  /* SLA bar hatch (time waiting on the institution) */
+  .hatch {
+    background-image: repeating-linear-gradient(135deg, rgba(95, 107, 104, 0.55) 0 2px, transparent 2px 5px);
+    background-color: rgba(95, 107, 104, 0.12);
+  }
+
+  /* skeleton */
+  .skeleton {
+    background: linear-gradient(90deg, #efede7 0px, #f7f6f2 120px, #efede7 240px);
+    background-size: 800px 100%;
+    animation: shimmer 1.4s linear infinite;
+    border-radius: 8px;
+  }
+
+  /* motion: transform and opacity only, never from fully transparent */
+  .enter { animation: enter 220ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .flash { animation: flash 1.6s ease-out both; }
+
+  .scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+  .scroll-thin::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 8px; }
 }
-.settle { animation: settle 0.28s ease-out both; }
 
 @keyframes shimmer {
   0% { background-position: -400px 0; }
   100% { background-position: 400px 0; }
 }
-.skeleton {
-  background: linear-gradient(90deg, var(--paper-2) 0px, color-mix(in srgb, var(--paper-2) 50%, var(--card)) 120px, var(--paper-2) 240px);
-  background-size: 800px 100%;
-  animation: shimmer 1.4s linear infinite;
-  border-radius: 6px;
+@keyframes enter {
+  from { opacity: 0.6; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes flash {
+  0% { background-color: rgba(230, 242, 240, 1); }
+  100% { background-color: rgba(230, 242, 240, 0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -180,22 +254,6 @@ a:hover {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
-}
-
-/* form controls */
-.input {
-  width: 100%;
-  background: #fffdf8;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 7px 10px;
-  font-size: 14px;
-  color: var(--ink);
-}
-.input:focus { outline: 2px solid var(--red); outline-offset: 0; border-color: var(--red); }
-textarea.input { min-height: 84px; resize: vertical; }
-
-.scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
-.scroll-thin::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; }
 }

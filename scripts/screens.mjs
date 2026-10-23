@@ -12,7 +12,7 @@ const base = webUrl(); // http://localhost:WEB_PORT (default 3001), or ARGUS_URL
 const [code = "off-NR-1", ...paths] = process.argv.slice(2);
 const sizes = (process.env.SIZES ?? "1366x768,1920x1080").split(",").map((s) => s.split("x").map(Number));
 const fullPage = process.env.FULL !== "0";
-const outDir = path.join(root, "screenshots");
+const outDir = path.join(root, "screenshots", process.env.SHOTS_DIR ?? "");
 mkdirSync(outDir, { recursive: true });
 
 // Uses the installed Microsoft Edge by default (no browser download needed on Windows).
