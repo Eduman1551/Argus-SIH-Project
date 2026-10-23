@@ -93,9 +93,16 @@ def set_session(body: SessionIn, response: Response):
     return {"ok": True}
 
 
+@router.post("/auth/login")
+def login(body: SessionIn, response: Response):
+    return set_session(body, response)
+
+
+@router.post("/auth/logout")
 @router.delete("/session")
 def end_session(response: Response):
-    response.delete_cookie(COOKIE, path="/")
+    """Log out: expire the session cookie. Every protected endpoint answers 401 afterwards."""
+    response.delete_cookie(COOKIE, path="/", httponly=True, samesite="lax")
     return {"ok": True}
 
 

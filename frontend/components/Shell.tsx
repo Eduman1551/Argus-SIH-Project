@@ -17,6 +17,8 @@ import { Popover } from "./shell/Popover";
 import { scopeText, UserMenu, ROLE_TEXT } from "./shell/UserMenu";
 
 const README = "https://github.com/Eduman1551/Argus-SIH-Project#readme";
+/** Pages that work without a session; everything else sends you to /login. */
+const PUBLIC = ["/login", "/welcome"];
 
 /* ================================================================ live polling */
 function useLive() {
@@ -53,7 +55,7 @@ export default function Shell({ children }: { children: ReactNode }) {
   }, [setSession]);
 
   useEffect(() => {
-    if (sessionLoaded && !user && pathname !== "/welcome") router.replace("/welcome");
+    if (sessionLoaded && !user && !PUBLIC.includes(pathname)) router.replace("/login");
   }, [sessionLoaded, user, pathname, router]);
 
   useEffect(() => {
@@ -67,7 +69,7 @@ export default function Shell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const welcome = pathname === "/welcome";
+  const welcome = PUBLIC.includes(pathname);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -100,7 +102,7 @@ function Navbar({ user, onPalette }: { user: SessionUser | null; onPalette: () =
   return (
     <div className="sticky top-0 z-40 px-3 pt-3 sm:px-4">
       <nav aria-label="Main" className={`glass mx-auto flex h-14 max-w-[1280px] items-center gap-2 rounded-2xl px-2.5 transition-[background-color,box-shadow] duration-200 ${scrolled ? "glass-strong" : ""}`}>
-        <Link href={user ? (user.role === "committee" ? "/my-cases" : "/") : "/welcome"} className="rounded-lg px-2 py-1 no-underline" aria-label="Argus home">
+        <Link href={user ? (user.role === "committee" ? "/my-cases" : "/") : "/login"} className="rounded-lg px-2 py-1 no-underline" aria-label="Argus home">
           <Wordmark />
         </Link>
         {user && <DesktopNav user={user} />}
@@ -122,7 +124,6 @@ function Navbar({ user, onPalette }: { user: SessionUser | null; onPalette: () =
               </button>
             </>
           )}
-          {!user && <Link href="/guide" className="rounded-lg px-3 py-2 text-[13px] text-ink-soft no-underline hover:text-ink">Guide</Link>}
         </div>
       </nav>
       <AnimatePresence>{user && mobile && <MobileSheet user={user} />}</AnimatePresence>

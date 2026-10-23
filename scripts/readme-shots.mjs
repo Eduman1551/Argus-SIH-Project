@@ -24,7 +24,7 @@ const channel = process.env.PW_CHANNEL ?? "msedge";
 const browser = await chromium.launch(channel === "chromium" ? {} : { channel });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
 const page = await context.newPage();
-await page.goto(`${base}/welcome`);
+await page.goto(`${base}/login`);
 // hide the "What to do here" tips so the screenshots show the page itself
 await page.evaluate(() => ["inst-home", "dashboard", "escalations", "evc", "rules"].forEach((id) => localStorage.setItem(`argus.help.${id}`, "hidden")));
 const users = (await (await page.request.get(`${base}/api/users/demo`)).json()).users;

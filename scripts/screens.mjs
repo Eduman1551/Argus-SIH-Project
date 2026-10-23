@@ -25,7 +25,7 @@ for (const [width, height] of sizes) {
   const errors = [];
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
   page.on("pageerror", (e) => errors.push(String(e)));
-  await page.goto(`${base}/welcome`);
+  await page.goto(`${base}/login`);
   const users = await (await page.request.get(`${base}/api/users/demo`)).json();
   const user = users.users.find((u) => u.code === code);
   if (!user) throw new Error(`unknown user ${code}`);

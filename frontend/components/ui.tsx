@@ -423,14 +423,14 @@ function useEscape(onClose: () => void) {
 }
 
 export function Modal({ title, children, onClose, footer, wide }: {
-  title: string; children: ReactNode; onClose: () => void; footer?: ReactNode; wide?: boolean;
+  title: string; children: ReactNode; onClose: () => void; footer?: ReactNode; wide?: boolean | "xl";
 }) {
   useEscape(onClose);
   return (
     <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-ink/25 p-4 pt-[9vh]" role="dialog" aria-modal="true" aria-label={title}
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <motion.div initial={{ y: 8, opacity: 0.7 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.18 }}
-        className={`w-full rounded-2xl border border-line bg-surface shadow-float ${wide ? "max-w-2xl" : "max-w-lg"}`}>
+        className={`w-full rounded-2xl border border-line bg-surface shadow-float ${wide === "xl" ? "max-w-4xl" : wide ? "max-w-2xl" : "max-w-lg"}`}>
         <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
           <h2 className="text-[16px] font-semibold">{title}</h2>
           <button aria-label="Close" onClick={onClose} className="rounded-md p-1 text-ink-soft hover:bg-surface-2 hover:text-ink"><X size={17} /></button>

@@ -35,6 +35,43 @@ def test_requires_a_demo_session(api):
     assert api.get("/api/dashboard").status_code == 401
 
 
+PROTECTED = ["/api/dashboard", "/api/applications", "/api/queue", "/api/rules", "/api/audit", "/api/notifications",
+             "/api/undertakings", "/api/kpi"]
+
+
+def test_signed_out_requests_get_401(api):
+    api.cookies.clear()
+    for path in PROTECTED:
+        assert api.get(path).status_code == 401, path
+    assert api.get("/api/session").json()["user"] is None
+    # the public bits still answer: health, the clock and the demo user list for the login page
+    assert api.get("/api/health").status_code == 200
+    assert api.get("/api/live").status_code == 200
+    assert api.get("/api/users/demo").status_code == 200
+
+
+def test_logout_ends_the_session(api):
+    api.cookies.clear()
+    assert api.post("/api/auth/login", json={"user_id": api.users["inst-AMB"]}).status_code == 200
+    assert api.get("/api/session").json()["user"]["role"] == "institution"
+    assert api.get("/api/dashboard").status_code == 200
+
+    r = api.post("/api/auth/logout")
+    assert r.status_code == 200
+    assert "argus_session=" in r.headers["set-cookie"] and "Max-Age=0" in r.headers["set-cookie"]
+    assert "argus_session" not in api.cookies
+    assert api.get("/api/session").json()["user"] is None
+    for path in PROTECTED:
+        assert api.get(path).status_code == 401, path
+
+    # signing back in as another role shows only that role's data
+    assert api.post("/api/auth/login", json={"user_id": api.users["evc-1"]}).status_code == 200
+    assert api.get("/api/session").json()["user"]["role"] == "committee"
+    assert api.get("/api/dashboard").json()["role"] == "committee"
+    assert api.get("/api/applications").status_code == 403
+    assert api.get("/api/rules").status_code == 403
+
+
 def test_institution_sees_only_its_own_cases_and_files(api):
     own, other = _case_id(api, "demo_scrutiny"), _case_id(api, "demo_l2")
     api.login("inst-AMB")

@@ -21,7 +21,7 @@ for (const [user, pages] of Object.entries(tour)) {
     { stdio: "inherit", env: { ...process.env, SHOTS_DIR: folder } });
   if (r.status !== 0) failed = true;
 }
-// the welcome page needs no user
-spawnSync(process.execPath, [path.join(here, "screens.mjs"), "inst-AMB", "/welcome"],
+// the login page
+spawnSync(process.execPath, [path.join(here, "screens.mjs"), "inst-AMB", "/login"],
   { stdio: "inherit", env: { ...process.env, SHOTS_DIR: folder } });
 process.exit(failed ? 1 : 0);

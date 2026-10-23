@@ -1,5 +1,5 @@
-// Visits the home page as Institution, Official and Committee by clicking the role switcher in the
-// top bar, takes a screenshot of each, and reports console errors and whether the clock is shown.
+// Visits the home page as Institution, Official and Committee by using Switch user in the
+// avatar menu, takes a screenshot of each, and reports console errors and whether the clock is shown.
 // Needs `pnpm dev`. Usage: pnpm screens:roles   (SIZE=1920x1080 to change the viewport)
 import { mkdirSync } from "node:fs";
 import path from "node:path";
@@ -29,15 +29,15 @@ page.on("response", (r) => { if (r.status() >= 400) network.push(`${r.request().
 let apiCalls = 0;
 page.on("response", (r) => { if (new URL(r.url()).pathname.startsWith("/api/") && r.ok()) apiCalls += 1; });
 
-// first sign-in from the welcome page, then switch with the top-bar menu
-await page.goto(`${base}/welcome`, { waitUntil: "networkidle" });
+// first sign-in from the login page, then Switch user from the avatar menu
+await page.goto(`${base}/login`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: /Dr\. Kavya Larkspur/ }).click();
 await page.waitForURL(`${base}/`);
 
 const tour = [
   { role: "institution", name: null, heading: "Ambervale Institute of Technology" },
-  { role: "official", name: /^Arjun Wrenfield/, heading: "Pendency dashboard" },
-  { role: "committee", name: /^Prof\. Vikram Duskwood/, heading: "My cases" },
+  { role: "official", name: /Arjun Wrenfield/, heading: "Dashboard" },
+  { role: "committee", name: /Prof\. Vikram Duskwood/, heading: "My cases" },
 ];
 let failed = false;
 for (const stop of tour) {
@@ -45,8 +45,9 @@ for (const stop of tour) {
   network.length = 0;
   apiCalls = 0;
   if (stop.name) {
-    await page.getByRole("button", { name: /^Switch demo user/ }).click();
-    await page.getByRole("menuitem", { name: stop.name }).click();
+    await page.getByRole("button", { name: /^Account menu/ }).click();
+    await page.getByRole("menuitem", { name: "Switch user" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: stop.name }).click();
   }
   await page.getByRole("heading", { level: 1, name: stop.heading }).waitFor({ timeout: 30000 });
   await page.waitForLoadState("networkidle");

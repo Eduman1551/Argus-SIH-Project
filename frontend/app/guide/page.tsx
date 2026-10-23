@@ -163,7 +163,7 @@ export default function GuidePage() {
             <div className="surface divide-y divide-line text-[13.5px]">
               {[
                 ["Simulated date", <>The date chip in the top bar opens <b className="font-medium">+1 day</b>, <b className="font-medium">+7 days</b>, <b className="font-medium">+30 days</b> and Reset. Each advance runs the alert check for every day passed.</>],
-                ["Switch user", "The avatar menu at the top right lists the demo users for each role."],
+                ["Sign in and out", "Open the avatar menu at the top right: Switch user signs you in as another demo user, Log out ends the session and returns you to the sign-in page."],
                 ["Search", <>Press <Kbd>Ctrl</Kbd> <Kbd>K</Kbd> to jump to any page or case, or to advance the clock.</>],
                 ["Quick look", "Click a row in a case table to preview it in a side sheet; arrow keys move between rows and Enter opens."],
               ].map(([k, v]) => (

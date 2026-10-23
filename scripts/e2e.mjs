@@ -25,7 +25,7 @@ async function step(label, fn) {
 const click = (name, opts = {}) => page.getByRole("button", { name, exact: opts.exact ?? false }).first().click();
 const expectText = (t) => page.getByText(t).first().waitFor({ timeout: 10000 });
 
-await page.goto(`${base}/welcome`);
+await page.goto(`${base}/login`);
 await page.request.post(`${base}/api/session`, { data: { user_id: id("off-NR-1") } });
 await page.request.post(`${base}/api/demo/reset`);
 // scripted demo cases from the synthetic dataset (stable ids: the seed is deterministic)
@@ -138,6 +138,26 @@ await step("audit chain verifies", async () => {
   await page.goto(`${base}/audit`);
   await click("Verify audit chain");
   await expectText("Chain intact");
+});
+
+await step("log out; pages and APIs refuse; log back in as another role", async () => {
+  await as("inst-AMB");
+  await page.goto(`${base}/`);
+  await page.getByRole("heading", { level: 1, name: "Ambervale Institute of Technology" }).waitFor();
+  await page.getByRole("button", { name: /^Account menu/ }).click();
+  await page.getByRole("menuitem", { name: "Log out" }).click();
+  await page.waitForURL(`${base}/login`);
+  for (const api of ["/api/dashboard", "/api/applications", "/api/undertakings"]) {
+    const r = await page.request.get(`${base}${api}`);
+    if (r.status() !== 401) throw new Error(`${api} answered ${r.status()} after logout`);
+  }
+  await page.goto(`${base}/undertakings`);
+  await page.waitForURL(`${base}/login`);
+  await page.getByRole("button", { name: /Arjun Wrenfield/ }).click();
+  await page.waitForURL(`${base}/`);
+  await page.getByRole("heading", { level: 1, name: "Dashboard" }).waitFor();
+  const inst = await page.request.get(`${base}/api/applications/${SCRUTINY}`);
+  if (inst.status() !== 200) throw new Error(`official cannot open the case: ${inst.status()}`);
 });
 
 await step("every page renders for every role", async () => {

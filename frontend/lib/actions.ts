@@ -52,19 +52,33 @@ export async function resetDemo(): Promise<boolean> {
   }
 }
 
+/** Sign in as a demo user (also used to switch user). */
 export async function switchUser(userId: number): Promise<SessionUser | null> {
   const s = useApp.getState();
   try {
-    await api("/api/session", { body: { user_id: userId } });
+    await api("/api/auth/login", { body: { user_id: userId } });
     const r = await api<{ user: SessionUser }>("/api/session");
     s.setSession(r.user);
     s.bumpVersion();
-    s.toast("info", `You are now ${r.user.name} (${r.user.role === "official" ? "Official" : r.user.role === "institution" ? "Institution" : "Committee"}).`);
+    s.toast("info", `Signed in as ${r.user.name} (${r.user.role === "official" ? "Official" : r.user.role === "institution" ? "Institution" : "Committee"}).`);
     return r.user;
   } catch (e) {
     s.toast("error", (e as Error).message);
     return null;
   }
+}
+
+/** Log out: the server expires the session cookie; every page then sends you to /login. */
+export async function logout(): Promise<void> {
+  const s = useApp.getState();
+  try {
+    await api("/api/auth/logout", { body: {} });
+  } catch (e) {
+    s.toast("error", (e as Error).message);
+    return;
+  }
+  s.setSession(null);
+  s.toast("info", "You are logged out.");
 }
 
 export interface DemoUser {
