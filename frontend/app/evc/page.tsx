@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { CalendarDays, Users } from "lucide-react";
-import { VisitStamp } from "@/components/home/CommitteeCases";
-import { ErrorNote, HelpBox, NextStep, PageHeader, PageSkeleton, Stat } from "@/components/ui";
+import { CalendarDays } from "lucide-react";
+import { VisitStamp } from "@/components/status";
+import { Avatar, Empty, ErrorNote, HelpBox, Metrics, NextStep, PageHeader, PageSkeleton, Stat, Tabs } from "@/components/ui";
 import { useApi } from "@/lib/api";
 import { dueText, fmtDate } from "@/lib/format";
 import { useApp } from "@/lib/store";
@@ -29,57 +29,64 @@ export default function EvcBoard() {
   if (error || !data) return <ErrorNote error={error ?? { message: "No data" }} onRetry={reload} />;
   const by = (c: string) => data.visits.filter((v) => v.category === c);
   const completed = by("completed").length;
+  const delayed = by("delayed").length;
 
   return (
     <div>
-      <PageHeader title="EVC scheduling board" description="Every Expert Visit Committee visit, from assignment to report review. Delayed visits sit in the red column."
+      <PageHeader crumbs={[{ label: "Monitoring" }, { label: "EVC board" }]} title="EVC scheduling board"
+        description="Every Expert Visit Committee visit, from assignment to report review. Delayed visits sit in the last column."
         action={user.official_kind === "regional" ? (
-          <div className="inline-flex rounded-md border border-line bg-card p-0.5 text-[13px]">
-            <button onClick={() => setAll(false)} className={`rounded px-3 py-1.5 ${!all ? "bg-brand text-white" : ""}`}>My Region</button>
-            <button onClick={() => setAll(true)} className={`rounded px-3 py-1.5 ${all ? "bg-brand text-white" : ""}`}>All Regions</button>
-          </div>) : undefined} />
+          <Tabs className="" value={all ? "all" : "mine"} onChange={(v) => setAll(v === "all")}
+            tabs={[{ id: "mine", label: `My Region` }, { id: "all", label: "All Regions" }]} />) : undefined} />
       <HelpBox id="evc">
-        Each card is one visit. Open it to assign members, fix the date or review the report. A visit goes to <b>Delayed</b> when any step
+        Each card is one visit. Open it to assign members, fix the date or review the report. A visit moves to <b>Delayed</b> when any step
         passes its configured limit; reminders and escalations for it are sent automatically.
       </HelpBox>
-      <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Open visits" value={data.visits.length - completed} />
-        <Stat label="Due now" value={by("due").length} tone="ochre" hint={`Visit within ${data.window_days} days`} />
-        <Stat label="Delayed" value={by("delayed").length} tone={by("delayed").length ? "red" : "olive"} />
-        <Stat label="Completed" value={completed} tone="olive" />
-      </div>
-      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-        {COLUMNS.map((col) => {
-          const items = by(col.id);
-          return (
-            <section key={col.id} className={`flex min-h-[220px] flex-col rounded-lg border ${col.id === "delayed" ? "border-brand/50 bg-brand-tint/40" : "border-line bg-paper-2/50"}`}>
-              <div className="border-b border-line/70 px-3 py-2">
-                <div className="flex items-center justify-between">
-                  <h2 className={`text-[15px] font-semibold ${col.id === "delayed" ? "text-brand-deep" : ""}`}>{col.title}</h2>
-                  <span className="rounded-full bg-card px-2 text-[12px] font-bold tabular-nums">{items.length}</span>
+      <Metrics>
+        <Stat label="Open visits" value={data.visits.length - completed} hint={all ? "All Regions" : user.region_name ?? ""} />
+        <Stat label="Due now" value={by("due").length} tone={by("due").length ? "ochre" : "ink"} hint={`Visit within ${data.window_days} days`} />
+        <Stat label="Delayed" value={delayed} tone={delayed ? "red" : "olive"} hint="A step past its limit" />
+        <Stat label="Completed" value={completed} tone="olive" hint="Report reviewed" />
+      </Metrics>
+      {data.visits.length === 0 ? <Empty title="No expert visits yet.">Visits appear here when a case reaches its EVC stage.</Empty> : (
+        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+          {COLUMNS.map((col) => {
+            const items = by(col.id);
+            const bad = col.id === "delayed" && items.length > 0;
+            return (
+              <section key={col.id} aria-label={`${col.title}: ${items.length}`}
+                className={`flex min-h-[240px] flex-col rounded-2xl border ${bad ? "border-danger/30 bg-danger-tint/50" : "border-line bg-surface-2"}`}>
+                <div className="px-3 pb-2 pt-3">
+                  <div className="flex items-center justify-between">
+                    <h2 className={`text-[14px] font-semibold ${bad ? "text-danger-ink" : ""}`}>{col.title}</h2>
+                    <span className={`mono rounded-full px-2 text-[12px] font-semibold ${bad ? "bg-danger text-white" : "bg-surface text-ink ring-1 ring-inset ring-line"}`}>{items.length}</span>
+                  </div>
+                  <div className="text-[12px] text-ink-soft">{col.hint}</div>
                 </div>
-                <div className="text-[12px] text-ink-soft">{col.hint}</div>
-              </div>
-              <div className="flex-1 space-y-2 p-2">
-                {items.map((v) => (
-                  <Link key={v.id} href={`/applications/${v.application_id}`} className="sheet block p-2.5 text-ink no-underline hover:border-brand/60">
-                    <div className="flex items-start justify-between gap-1">
-                      <span className="text-[13.5px] font-semibold text-brand">{v.ref_no}</span>
-                    </div>
-                    <div className="truncate text-[12.5px] text-ink-soft">{v.institution}</div>
-                    <div className="mt-1.5 text-[13px] font-medium">{v.step}</div>
-                    {v.visit_date && <div className="flex items-center gap-1 text-[12.5px]"><CalendarDays size={12} /> {fmtDate(v.visit_date)}</div>}
-                    {v.step_due_at && <div className={`text-[12px] ${v.days_to_due != null && v.days_to_due < 0 ? "font-semibold text-brand" : "text-ink-soft"}`}>Step {dueText(v.days_to_due)}</div>}
-                    {v.members.length > 0 && <div className="mt-1 flex items-center gap-1 truncate text-[12px] text-ink-soft"><Users size={12} /> {v.members.map((m) => m.name.split(" ").slice(-1)[0]).join(", ")}</div>}
-                    {(v.escalation_level || v.category === "delayed" || v.category === "due") && <div className="mt-1.5"><VisitStamp v={v} /></div>}
-                  </Link>
-                ))}
-                {!items.length && <div className="px-1 py-4 text-center text-[12.5px] text-ink-soft">None</div>}
-              </div>
-            </section>
-          );
-        })}
-      </div>
+                <div className="flex-1 space-y-2 px-2 pb-2">
+                  {items.map((v) => (
+                    <Link key={v.id} href={`/applications/${v.application_id}`}
+                      className="surface block p-2.5 text-ink no-underline transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-md">
+                      <div className="mono text-[12.5px] font-medium text-brand">{v.ref_no}</div>
+                      <div className="truncate text-[12px] text-ink-soft">{v.institution}</div>
+                      <div className="mt-1.5 text-[12.5px] font-medium leading-snug">{v.step}</div>
+                      {v.visit_date && <div className="mono mt-0.5 flex items-center gap-1 text-[11.5px]"><CalendarDays size={12} className="text-brand" /> {fmtDate(v.visit_date)}</div>}
+                      {v.step_due_at && <div className={`text-[11.5px] ${v.days_to_due != null && v.days_to_due < 0 ? "font-medium text-danger-ink" : "text-ink-soft"}`}>Step {dueText(v.days_to_due)}</div>}
+                      {v.members.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap gap-1" aria-label={`Members: ${v.members.map((m) => m.name).join(", ")}`}>
+                          {v.members.slice(0, 5).map((m) => <Avatar key={m.user_id} name={m.name} size={22} />)}
+                        </div>
+                      )}
+                      {(v.escalation_level || v.category === "delayed" || v.category === "due") && <div className="mt-1.5"><VisitStamp v={v} /></div>}
+                    </Link>
+                  ))}
+                  {!items.length && <div className="rounded-xl border border-dashed border-line px-2 py-5 text-center text-[12px] text-ink-soft">None</div>}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      )}
       <NextStep href="/compliance" label="undertakings and verification" />
     </div>
   );

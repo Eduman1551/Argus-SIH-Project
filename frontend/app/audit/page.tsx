@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useEffect, useState } from "react";
-import { Bot, Link2, ShieldAlert, ShieldCheck, User } from "lucide-react";
-import { Button, Card, ErrorNote, HelpBox, NextStep, PageHeader, PageSkeleton, Table } from "@/components/ui";
+import { useCallback, useEffect, useState } from "react";
+import { ArrowDown, Bot, Search, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Avatar, Button, Callout, Card, Drawer, ErrorNote, HelpBox, KeyVal, NextStep, PageHeader, PageSkeleton, Table, useRowNav } from "@/components/ui";
 import { api, useApi } from "@/lib/api";
 import { fmtDateTime } from "@/lib/format";
 import { ACTION_TEXT } from "@/lib/labels";
@@ -28,6 +28,8 @@ export default function AuditPage() {
   if (qd) params.set("q", qd);
   const { data, error, loading, reload } = useApi<{ rows: Entry[]; total: number; action_groups: string[] }>(user.role === "official" ? `/api/audit?${params}` : null);
   useEffect(() => setExtra([]), [group, qd]);
+  const onOpen = useCallback((i: number) => setOpen((o) => { const id = [...(data?.rows ?? []), ...extra][i]?.id ?? null; return o === id ? null : id; }), [data, extra]);
+  const rowProps = useRowNav((data?.rows.length ?? 0) + extra.length, onOpen);
   if (user.role !== "official") return <ErrorNote error={{ message: "The audit trail is visible to officials." }} />;
 
   const runVerify = async () => {
@@ -44,58 +46,84 @@ export default function AuditPage() {
     setExtra([...extra, ...r.rows]);
   };
   const rows = [...(data?.rows ?? []), ...extra];
+  const sel = rows.find((e) => e.id === open);
 
   return (
     <div>
-      <PageHeader title="Audit trail" description="Every action, alert, submission, verification and escalation, in order. Entries cannot be edited, and each one is chained to the one before it."
-        action={<Button kind="primary" busy={verifying} onClick={runVerify}><ShieldCheck size={16} /> Verify audit chain</Button>} />
+      <PageHeader crumbs={[{ label: "Insight" }, { label: "Audit trail" }]} title="Audit trail" description="Every action, alert, submission, verification and escalation, in order. Entries cannot be edited, and each one is chained to the one before it."
+        action={<Button kind="primary" busy={verifying} onClick={runVerify}><ShieldCheck size={15} /> Verify audit chain</Button>} />
       <HelpBox id="audit">Press <b>Verify audit chain</b> to recompute every fingerprint from the first entry. If anyone changed or deleted a past entry in the database, the check shows exactly where the chain breaks.</HelpBox>
       {verify && (
-        <div className={`sheet settle mb-5 flex items-start gap-3 border-l-4 px-4 py-3 ${verify.valid ? "border-l-olive" : "border-l-brand"}`} role="status">
-          {verify.valid ? <ShieldCheck className="mt-0.5 text-olive-ink" /> : <ShieldAlert className="mt-0.5 text-brand" />}
-          <div className="text-[14px]">
-            <div className="font-semibold">{verify.valid ? `Chain intact: all ${verify.checked} entries verified.` : `Chain broken at entry #${verify.broken_at}.`}</div>
-            <div className="text-ink-soft">{verify.valid ? <>Latest fingerprint <code className="text-[12px]">{verify.head?.slice(0, 24)}…</code></> : verify.reason}</div>
+        <div role="status" className={`enter mb-6 flex items-start gap-3 rounded-2xl border px-4 py-3.5 ${verify.valid ? "border-brand/25 bg-brand-tint" : "border-danger/30 bg-danger-tint"}`}>
+          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white ${verify.valid ? "bg-brand" : "bg-danger"}`}>
+            {verify.valid ? <ShieldCheck size={18} /> : <ShieldAlert size={18} />}
+          </span>
+          <div className="text-[13.5px]">
+            <div className="font-semibold">{verify.valid ? <>Chain intact: all <span className="mono">{verify.checked}</span> entries verified.</> : <>Chain broken at entry <span className="mono">#{verify.broken_at}</span>.</>}</div>
+            <div className="text-ink-soft">{verify.valid ? <>Latest fingerprint <code className="mono text-[12px] text-ink">{verify.head?.slice(0, 24)}…</code></> : verify.reason}</div>
           </div>
         </div>
       )}
-      <div className="sheet mb-4 flex flex-wrap items-center gap-3 p-3">
-        <select className="input w-auto" value={group} onChange={(e) => setGroup(e.target.value)} aria-label="Action type">
+      <div className="mb-4 flex flex-wrap items-center gap-2.5">
+        <div className="relative w-full max-w-sm">
+          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
+          <input className="field pl-9" placeholder="Search person, case reference or details" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search" />
+        </div>
+        <select className="field w-auto" value={group} onChange={(e) => setGroup(e.target.value)} aria-label="Action type">
           <option value="">All actions</option>{data?.action_groups.map((g) => <option key={g} value={g}>{g}</option>)}
         </select>
-        <input className="input max-w-sm" placeholder="Search person, case reference or details" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search" />
-        <span className="ml-auto text-[13px] text-ink-soft">{data ? `${data.total} entries in total` : ""}</span>
+        <span className="mono ml-auto text-[12.5px] text-ink-soft">{data ? `${data.total} entries` : ""}</span>
       </div>
       {loading ? <PageSkeleton /> : error ? <ErrorNote error={error} onRetry={reload} /> : (
-        <Card pad={false} title="Entries" subtitle="Newest first. Click a row to see its details and fingerprints.">
+        <Card pad={false} title="Entries" subtitle="Newest first. Click a row to see its details and how it links to the entry before it.">
           <Table minWidth={980}>
             <thead><tr><th className="num">#</th><th>When (simulated)</th><th>Who</th><th>What</th><th>Case</th><th>Fingerprint</th></tr></thead>
             <tbody>
-              {rows.map((e) => (
-                <Fragment key={e.id}>
-                  <tr className={`row-link ${open === e.id ? "selected" : ""}`} onClick={() => setOpen(open === e.id ? null : e.id)}>
-                    <td className="num text-ink-soft">{e.id}</td>
-                    <td className="whitespace-nowrap text-[13px]">{fmtDateTime(e.at)}</td>
-                    <td className="max-w-[260px] text-[13px]"><span className="inline-flex items-start gap-1.5">{e.actor_id ? <User size={13} className="mt-0.5 shrink-0" /> : <Bot size={13} className="mt-0.5 shrink-0 text-ink-soft" />}{e.actor_label}</span></td>
-                    <td>{ACTION_TEXT[e.action] ?? e.action}<div className="text-[12px] text-ink-soft">{e.action} · {e.entity_type} {e.entity_id}</div></td>
-                    <td>{e.application_id ? <Link href={`/applications/${e.application_id}`} onClick={(ev) => ev.stopPropagation()} className="no-underline">{e.ref_no}</Link> : "–"}</td>
-                    <td><code className="text-[12px] text-ink-soft" title={e.hash}><Link2 size={11} className="mr-1 inline" />{e.hash.slice(0, 10)}</code></td>
-                  </tr>
-                  {open === e.id && (
-                    <tr><td colSpan={6} className="bg-paper-2/40">
-                      <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-[12px]">{JSON.stringify(e.details, null, 2)}</pre>
-                      <div className="mt-1 break-all text-[11.5px] text-ink-soft">previous: {e.prev_hash}<br />this: {e.hash}</div>
-                    </td></tr>
-                  )}
-                </Fragment>
+              {rows.map((e, i) => (
+                <tr key={e.id} {...rowProps(i)} className={`is-link ${open === e.id ? "is-active" : ""}`} aria-label={`Details of entry ${e.id}`}>
+                  <td className="num mono text-ink-soft">{e.id}</td>
+                  <td className="mono whitespace-nowrap text-[12.5px]">{fmtDateTime(e.at)}</td>
+                  <td className="max-w-[260px] text-[13px]"><span className="inline-flex items-center gap-2">{e.actor_id ? <Avatar name={e.actor_label} /> : <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-surface-2 text-ink-soft ring-1 ring-inset ring-line"><Bot size={12} /></span>}<span className="truncate">{e.actor_id ? e.actor_label : "Argus automation"}</span></span></td>
+                  <td>{ACTION_TEXT[e.action] ?? e.action}<div className="mono text-[11.5px] text-ink-soft">{e.action}</div></td>
+                  <td>{e.application_id ? <Link href={`/applications/${e.application_id}`} onClick={(ev) => ev.stopPropagation()} className="mono no-underline">{e.ref_no}</Link> : <span className="text-ink-soft">–</span>}</td>
+                  <td><code className="mono inline-flex h-[20px] items-center rounded-md bg-surface-2 px-1.5 text-[11px] text-ink-soft ring-1 ring-inset ring-line" title={e.hash}>{e.hash.slice(0, 8)}</code></td>
+                </tr>
               ))}
             </tbody>
           </Table>
           {data && rows.length < data.total && rows.length >= 100 && (
-            <div className="border-t border-line/70 p-3 text-center"><Button small onClick={more}>Load older entries</Button></div>
+            <div className="border-t border-line p-3 text-center"><Button small onClick={more}>Load older entries</Button></div>
           )}
         </Card>
       )}
+      <Drawer open={!!sel} onClose={() => setOpen(null)} title={sel ? (ACTION_TEXT[sel.action] ?? sel.action) : ""}
+        subtitle={sel ? <span className="mono">Entry #{sel.id} · {fmtDateTime(sel.at)}</span> : undefined}>
+        {sel && (
+          <div className="space-y-5">
+            <KeyVal items={[
+              ["Who", sel.actor_id ? sel.actor_label : "Argus automation"],
+              ["Action", <span key="a" className="mono text-[12.5px]">{sel.action}</span>],
+              ["Item", <span key="i" className="mono text-[12.5px]">{sel.entity_type} {sel.entity_id}</span>],
+              ["Case", sel.application_id ? <Link key="c" href={`/applications/${sel.application_id}`} className="mono">{sel.ref_no}</Link> : "–"],
+            ]} />
+            <div>
+              <div className="mb-2 text-[12.5px] font-medium text-ink-soft">Hash chain</div>
+              <div className="rounded-xl border border-line bg-surface-2 p-3">
+                <div className="text-[11.5px] text-ink-soft">Previous entry</div>
+                <code className="mono block break-all text-[11.5px]">{sel.prev_hash}</code>
+                <ArrowDown size={14} className="my-1.5 text-brand" aria-hidden />
+                <div className="text-[11.5px] text-ink-soft">This entry (hash of the previous hash plus this entry)</div>
+                <code className="mono block break-all text-[11.5px] font-medium text-brand-hover">{sel.hash}</code>
+              </div>
+            </div>
+            <div>
+              <div className="mb-2 text-[12.5px] font-medium text-ink-soft">Recorded details</div>
+              <pre className="mono max-h-72 overflow-auto whitespace-pre-wrap rounded-xl border border-line bg-surface-2 p-3 text-[11.5px]">{JSON.stringify(sel.details, null, 2)}</pre>
+            </div>
+            <Callout kind="note">Entries are append-only. Changing any past entry breaks every hash after it, which the Verify button detects.</Callout>
+          </div>
+        )}
+      </Drawer>
       <NextStep href="/performance" label="performance and KPIs" />
     </div>
   );
