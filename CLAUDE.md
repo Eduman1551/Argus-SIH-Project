@@ -3,7 +3,7 @@
 Read this whole file before writing code. Build **Version 1** of the prototype end to end, exactly as described here.
 
 - **v1 (now):** everything in sections 3 to 5.
-- **Later (not now):** everything in section 6. Do not build it, only list it in the README "Future scope".
+- **Later (not now):** everything in section 6. Do not build it, only list it under "Future scope" in docs/DETAILS.md (linked from the README).
 
 ---
 
@@ -99,7 +99,7 @@ Users (Institution | Official | Committee)
 | `backend/db` | `schema.sql` and a small `psycopg` data-access layer (plain SQL) |
 | `frontend/` | Next.js portal |
 
-**Auth in v1 is a demo session, and we say so honestly.** Seeded demo users with a user picker (the role switcher in the avatar menu of the navbar) and a signed session cookie. The backend still **enforces** scoped authorization on every route (institutions see only their own data, committees only assigned cases, only Bureau officers edit rules). Real login, SSO and password flows are future scope.
+**Auth in v1 is a demo session, and we say so honestly.** Seeded demo users with a user picker at `/login` (also opened by Switch user in the avatar menu), a signed session cookie, and Log out (`POST /api/auth/logout` expires the cookie; signed-out requests get 401 and pages redirect to `/login`). The backend still **enforces** scoped authorization on every route (institutions see only their own data, committees only assigned cases, only Bureau officers edit rules). Real login, SSO and password flows are future scope.
 
 ---
 
@@ -137,7 +137,7 @@ Include **scripted demo cases** (named in the data generator) that make `docs/DE
 
 ---
 
-## 6. OUT OF SCOPE for v1 (future scope; do NOT build, only list in the README)
+## 6. OUT OF SCOPE for v1 (future scope; do NOT build, only list in docs/DETAILS.md)
 
 - Integration with real AICTE systems, real SSO / DigiLocker / e-Sign, real login and password management
 - Real email, SMS and WhatsApp delivery
@@ -191,6 +191,8 @@ Show these on a Results / Performance page with a one-line plain explanation eac
 
 Multi-page app (Next.js App Router), desktop-first, good at 1366x768 and 1920x1080 with no horizontal scroll, and nothing broken at 1024. Each page has one purpose. Plain English. A page pattern like this: a doc-style header (breadcrumbs, title, one-line description, at most one primary action on the right), a dismissible "What to do here" tip (remembered in localStorage), and a "Next: ..." link at the bottom. Empty states say what to do next, and loading uses skeletons. Technical terms stay out of main copy.
 
+**Keep it simple.** A first-time visitor should understand any page in about 5 seconds: one purpose, one primary action, at most 3 to 4 main blocks above the fold, plain short wording for a non-technical user. Dashboards show about 4 KPIs and 1 to 2 visuals; all 8 KPIs live only on `/performance`. Tables show the 5 to 6 most useful columns; the rest go in a side sheet, and extra filters sit under a "Filters" button. Technical detail (hashes, rule keys, raw IDs, engine names) appears only in detail views: the audit hash on an expanded timeline event or the audit side sheet, the escalation ladder behind "View details" or in the side sheet. No "v1", "synthetic" or "simulated" labels beyond the footer note, the login page, the guide and the email/SMS log.
+
 **Theme: "stone and pine" (light only).** Calm, precise and official, like a well-made product for a government office: warm stone background, white surfaces, deep pine as the one brand colour. Not a generic SaaS blue, and no paper textures.
 
 | Token | Value | Use |
@@ -212,7 +214,7 @@ Multi-page app (Next.js App Router), desktop-first, good at 1366x768 and 1920x10
 - **Charts (Recharts):** a teal ramp for normal data; amber and red only for exceptions (due soon, overdue). Always label axes and values.
 - **Motion:** 150 to 250 ms, transform and opacity only, never starting content from opacity 0; numbers count up, the nav pill slides, drawers slide in, skeletons fade. Respect reduced motion.
 
-**Shell:** no sidebar and no top banner. A sticky, floating **glass navbar** (about 1280 px wide, 14 to 16 px radius, backdrop blur with a solid fallback, more opaque on scroll) with: the Argus mark (two arcs and a dot), role-aware grouped navigation (Official: Overview, Cases, Monitoring, Insight, plus Configure for Bureau officers) with a sliding active pill, a search button for the **command palette (Ctrl+K)**, the **simulated clock chip** (date; popover with +1 day / +7 days / +30 days and Reset; a toast like "7 days advanced: 12 reminders sent, 3 items overdue, 1 escalated to L2"), the notification bell popover, and the avatar menu with the demo **role switcher**. A hamburger sheet replaces the nav below 1024 px. A muted footer on every page: "Prototype · all data is synthetic", the version, and links to the Guide and README.
+**Shell:** no sidebar and no top banner. A sticky, floating **glass navbar** (about 1280 px wide, 14 to 16 px radius, backdrop blur with a solid fallback, more opaque on scroll) with: the Argus mark (two arcs and a dot), role-aware navigation with at most 4 to 5 top-level items (Official: Overview, Cases, Monitoring, Reports, plus Rules for Bureau officers; Institution: Home, Applications, Undertakings, Documents; Committee: My cases, Guide) with a sliding active pill, a short "Search" button for the **command palette (Ctrl+K)**, the **simulated clock chip** (date; popover with +1 day / +7 days / +30 days and Reset; a toast like "7 days advanced: 12 reminders sent, 3 items overdue, 1 escalated to L2"), the notification bell popover, and the avatar menu (name and role, **Switch user**, Guide, **Log out**). A hamburger sheet replaces the nav below 1024 px. A muted footer on every page: "Prototype · all data is synthetic" and links to the Guide and README.
 
 **Signature elements**
 
@@ -230,13 +232,14 @@ Multi-page app (Next.js App Router), desktop-first, good at 1366x768 and 1920x10
 
 | Role | Route | Purpose |
 |---|---|---|
-| Institution | `/` Home | My applications and current stage, pending actions, deficiencies and response dates, EVC schedule, open undertakings, evidence awaiting verification, documents expiring soon |
+| All | `/login` | Demo sign-in: user picker grouped by role, one click (no session needed); `/welcome` redirects here |
+| Institution | `/` Home | What needs you, the 90-day deadline calendar, my applications with their time-limit bars |
 | Institution | `/applications/[id]` | Case timeline, deficiency response form, uploads |
 | Institution | `/undertakings`, `/documents` | Submit evidence and renewals, see due dates and status |
-| Official | `/` Dashboard | Counts by Region and stage, stage-wise ageing, unassigned tasks, total elapsed time, time waiting on institution vs officials, near-deadline and overdue lists |
-| Official | `/queue` | My tasks, unassigned tasks, assign / reassign |
+| Official | `/` Dashboard | 4 metrics, the process line with the most urgent cases, and Regions / deadline calendar in one tabbed card (waiting-time split, ageing and unassigned tasks moved to the queue, reports and performance) |
+| Official | `/queue` | My cases, things to verify, unassigned visits; waiting-on-others and team workload in one tabbed card |
 | Official | `/applications`, `/applications/[id]` | Filterable list; case page with timeline, documents, actions (assign, return with reason, advance, record outcome) and the case summary |
-| Official | `/evc` | EVC scheduling board: queue, scheduled, due, delayed |
+| Official | `/evc` | Expert visits board: to arrange, scheduled, due now, report, delayed |
 | Official | `/compliance` | Undertakings and verification queue |
 | Official | `/validity` | Document expiry board |
 | Official | `/escalations` | Overdue items by escalation level |
@@ -266,7 +269,7 @@ Multi-page app (Next.js App Router), desktop-first, good at 1366x768 and 1920x10
 
 **`scripts/smoke.py`:** a headless run of the demo scenario through the API. It asserts the key outcomes and prints the KPI table (this feeds the README results).
 
-**README:** problem, solution, architecture (a Mermaid diagram of section 3), setup and run steps (Windows), demo steps, measured KPI results, synthetic-data and illustrative-rules note, tech stack, future scope. Keep it short and clear. Put long details in `docs/DETAILS.md`.
+**README:** short (about 60 to 80 lines, no diagrams, no long tables): name and one-line description, live demo link and the synthetic-data note, 3 to 4 feature bullets, the 3 roles and how to log in, a one-line tech stack, the quick start commands (ports 8001 and 3001), environment variable names only, how to run tests, a one-line Vercel note, and links to docs/DEMO.md, the Guide page and this file. Architecture (Mermaid), commands, measured KPI results, screenshots and future scope live in `docs/DETAILS.md`.
 
 **`docs/DEMO.md`:** a 4 to 5 minute script: (1) institution view of its cases and deadlines, (2) submit or open an application and watch it route, (3) official raises a deficiency, the institution responds, re-scrutiny moves it on, (4) EVC scheduling board and a delayed EVC alert, (5) advance the clock so an undertaking and a lease expiry trigger reminders and then an escalation, (6) the official verifies evidence and closes the case, (7) the audit trail and Verify chain, (8) the dashboards, reports and the KPI page.
 
