@@ -1,5 +1,131 @@
 # Argus: technical details
 
+The README is kept short on purpose; this file holds everything else.
+
+## The problem, in full
+
+AICTE approves technical institutions through stages such as scrutiny and re-scrutiny, Expert Visit
+Committee (EVC) visits and SAC/SHC review. Some approvals carry time-bound undertakings, and institutions
+must keep documents such as land leases valid. Today officers in each Region track all of this by hand, so
+deadlines slip, visits get delayed and documents expire unnoticed.
+
+Argus ("the hundred-eyed watchman") routes every application through the stages its type requires, monitors
+pendency, ageing, EVC scheduling, undertakings and document validity on role-based dashboards, sends reminders
+before deadlines and escalates overdue items L1 to L3 up a configurable chain, and records every step in an
+append-only, hash-chained audit trail.
+
+Humans decide. Decisions and committee recommendations are recorded by the competent person, with who, when
+and why. Automation is limited to routing, reminders, escalations, drafting and record keeping. Every rule,
+time limit and reminder day is an illustrative assumption, not an official APH figure.
+
+## Architecture
+
+```mermaid
+flowchart TD
+    U["Institution · Official · Committee"] --> W["Role-based web portal<br/>Next.js, polling /api/live every 3 s"]
+    W --> A["FastAPI: demo identity + scoped authorization"]
+    A --> WF["Workflow engine<br/>routes, stages, scrutiny, deficiency loop, revert, decisions"]
+    A --> CO["Compliance engine<br/>undertakings, evidence, document validity, renewals"]
+    A --> SC["Scheduling engine<br/>EVC queue, availability, visit date, reports"]
+    WF & CO & SC --> SH["Shared services: documents + versions + SHA-256, deadlines,<br/>notifications + simulated delivery, audit, reports, KPIs"]
+    SH --> DB[("PostgreSQL<br/>config tables · case data · files · audit chain")]
+    T["Alert tick (idempotent)<br/>on /api/live, on clock advance, on Vercel Cron"] --> DB
+    T --> N["Reminders → overdue alert → escalation L1/L2/L3<br/>in-app + simulated email/SMS"]
+    N --> I["Institution submits evidence"] --> O["Official verifies"] --> C["Closed, or escalated further"]
+```
+
+All deadlines read time from one simulated platform clock (the date chip in the navbar: +1 day, +7 days,
++30 days, Reset). The clock moves one day at a time and runs the alert tick each day, so reminders fire on
+exactly their day.
+
+## Sign-in and sign-out
+
+Sign-in is a demo user picker at `/login`, grouped by role. Picking a user calls `POST /api/auth/login`,
+which sets an HMAC-signed session cookie. `POST /api/auth/logout` expires the cookie; after that every
+protected endpoint answers 401 and every page sends you back to `/login`. Only `/api/health`, `/api/live`,
+`/api/clock` and `/api/users/demo` (the picker) answer without a session. Switch user (avatar menu) opens
+the same picker in a dialog. Real login, SSO and password flows are future scope.
+
+## Running locally in detail
+
+Needs Python 3.11 to 3.13, Node 20.9+ (tested on 22.23.4, see `.nvmrc`), pnpm 11 and PostgreSQL 14+.
+Install Node with [nvm for Windows](https://github.com/coreybutler/nvm-windows), then pnpm into that Node:
+
+```powershell
+nvm install 22.23.4
+nvm use 22.23.4             # once, from an admin terminal if nvm asks
+npm install -g pnpm@11.9.0
+```
+
+- Argus uses its own ports, 8001 (API) and 3001 (web), so it can run next to other projects on 8000/3000.
+  Change them with `API_PORT` / `WEB_PORT` in `.env`; the web proxy follows `API_PORT`.
+- If a port is busy, `pnpm dev` stops and says which process holds it. `pnpm dev:clean` stops only Argus dev
+  servers on those two ports and never touches other programs.
+- Write `pnpm run setup` with `run`: `pnpm setup` is a built-in pnpm command. Setup is safe to repeat.
+- Works with Neon: use the pooled connection string with `sslmode=require`. Over the internet each query costs
+  a round trip (about 90 ms from India to a Neon region), so the app batches writes and caches lookups per
+  request; on Vercel, next to the database, everything is much faster.
+- No Postgres password at hand? `pnpm db:local` starts a project-local cluster on port 5433 (needs the
+  PostgreSQL `bin` folder on PATH); use `DATABASE_URL=postgresql://argus@localhost:5433/argus`.
+
+| Command | What it does |
+|---|---|
+| `pnpm db:init` | create the tables if they do not exist (never drops data; safe to repeat) |
+| `pnpm db:seed` | replace all data with the synthetic dataset (`data/seed.copy.gz`); repeating it never duplicates |
+| `pnpm db:generate` | rebuild the dataset by replaying ~300 simulated days through the engines (deterministic; run it on a local database) |
+| `pnpm db:reset` | restore the seeded state (same as the Reset button) |
+| `pnpm test` | pytest suite in a separate `<db>_test` database; the dataset regeneration test runs only on a local database or with `ARGUS_SLOW_TESTS=1` |
+| `pnpm lint` | ruff on the Python code |
+| `pnpm smoke` | headless demo scenario through the API, prints the KPI table |
+| `pnpm e2e` | Playwright click-through of the demo path in the real UI, including log out and back in (needs `pnpm dev`; uses installed Edge) |
+| `pnpm screens <user> <paths…>` | screenshots at 1366x768 and 1920x1080 |
+| `node scripts/screens-all.mjs <folder>` | every page for every role, into `screenshots/<folder>/` |
+| `node scripts/readme-shots.mjs` | the images in `docs/screenshots/` |
+
+## Measured results
+
+From `pnpm smoke` on the synthetic dataset (guided scenario, then 37 simulated days). Targets are our own
+suggestions, not official requirements. Every value is computed live on the Performance page.
+
+| # | KPI | Result | Suggested target |
+|---|---|---|---|
+| 1 | Workflow routing accuracy (61 applications) | 100% | 100% |
+| 2 | Alert timeliness (462 alerts, fired on their configured day) | 100% | 100% |
+| 3 | Deadline tracking reliability (38 open overdue items checked) | 0 missed | 0 |
+| 4 | Pendency visibility (31 overdue cases on dashboard and report) | 100% | 100% |
+| 5 | Manual follow-up reduction (285 reminders, 57 overdue alerts, 120 escalations; 1 follow-up per alert assumed) | 462 | shown as a count |
+| 6 | Escalation coverage (38 overdue items) | 100% | 100% |
+| 7 | Audit completeness (1,078 records) and chain verification | 100%, chain valid | 100%, valid |
+| 8 | Average days per stage, AICTE + institution | Completeness 3.5 + 1.2 · Scrutiny 11.2 + 3.5 · EVC 29.5 · SAC/SHC 7.9 · Decision 3.6 | shown |
+
+The routing self-test on the Performance page also pushes one test application of every type through all its
+stages inside a rolled-back transaction: 7 of 7 routed correctly.
+
+## Screenshots
+
+Synthetic data throughout.
+
+| | |
+|---|---|
+| ![Official dashboard](screenshots/official-dashboard.png) | ![Case page](screenshots/case-page.png) |
+| **Official dashboard** | **Case page** |
+| ![Institution home](screenshots/institution-home.png) | ![Escalations](screenshots/escalations.png) |
+| **Institution home** | **Escalations** |
+| ![Expert visits board](screenshots/evc-board.png) | ![Rules page](screenshots/rules.png) |
+| **Expert visits** | **Rules** |
+
+## Future scope (not built in v1)
+
+- Integration with real AICTE systems, real SSO, DigiLocker and e-Sign, real login and password management
+- Real email, SMS and WhatsApp delivery
+- Automated document content checks (OCR, authenticity checks)
+- AI-based risk scoring or prediction of delays
+- Mobile app and multilingual UI
+- Advanced analytics and cross-year trends
+- An admin / user-management role and self-registration
+- Full APH rule coverage for every approval type and scenario
+- Geo-tagged inspections and video visits
+
 ## Repository layout
 
 | Path | What it holds |
