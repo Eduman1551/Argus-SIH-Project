@@ -17,6 +17,7 @@ interface Esc {
   id: number; entity_type: string; entity_id: number; level: number; due_date: string; escalated_at: string; status: string;
   resolved_at: string | null; title: string; application_id: number | null; ref_no: string | null; institution: string | null;
   region: string | null; target: string | null; level_title: string; days_overdue: number;
+  history?: { level: number; escalated_at: string; target: string | null }[];
 }
 interface Level { level: number; title: string; target: string }
 interface Item { key: string; top: Esc; all: Esc[]; level: number; rungs: Rung[]; next: { level: number; date: string } | null }
@@ -37,8 +38,9 @@ function group(open: Esc[], levels: Level[], rules: ReturnType<typeof useEscalat
   return [...map.entries()].map(([key, all]) => {
     const level = Math.max(...all.map((e) => e.level));
     const top = all.find((e) => e.level === level)!;
+    const steps = top.history ?? all.map((e) => ({ level: e.level, escalated_at: e.escalated_at, target: e.target }));
     const rungs = levels.map((l) => {
-      const hit = all.find((e) => e.level === l.level);
+      const hit = steps.find((e) => e.level === l.level);
       return { level: l.level, title: l.title, reachedAt: hit?.escalated_at ?? null, to: hit?.target ?? l.title.replace(/^L\d:\s*/, "") };
     });
     return { key, top, all, level, rungs, next: nextStep(top.entity_type, top.due_date, level, rules) };

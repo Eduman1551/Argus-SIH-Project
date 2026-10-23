@@ -602,12 +602,16 @@ def list_escalations(request: Request, all_regions: bool = False):
                ORDER BY e.status, e.level DESC, e.escalated_at DESC""", {"r": scope, "today": clock.today(c)})
         # one row per item at its highest open level
         open_items: dict[tuple, dict] = {}
+        history: dict[tuple, list] = {}
         for e in rows:
             if e["status"] != "open":
                 continue
             key = (e["entity_type"], e["entity_id"])
+            history.setdefault(key, []).append({"level": e["level"], "escalated_at": e["escalated_at"], "target": e["target"]})
             if key not in open_items or e["level"] > open_items[key]["level"]:
                 open_items[key] = e
+        for key, e in open_items.items():
+            e["history"] = sorted(history[key], key=lambda h: h["level"])
         resolved = [e for e in rows if e["status"] == "resolved"][:40]
         return {"open": sorted(open_items.values(), key=lambda e: (-e["level"], -e["days_overdue"])),
                 "resolved": resolved, "levels": c.all("SELECT * FROM escalation_levels ORDER BY level")}
