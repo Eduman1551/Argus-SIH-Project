@@ -14,6 +14,7 @@ undertakings in one place, so nothing slips through unnoticed. Built for SIH 202
 - **Watches deadlines** on role-based dashboards: scrutiny, expert visits, undertakings and document expiry.
 - **Reminds and escalates** automatically: reminders before a due date, then escalation up a chain (L1 to L3).
 - **Records everything** in a tamper-evident audit trail. People make every decision; Argus never approves or rejects.
+- **Sees delays coming**: a transparent delay-risk score explains which cases are likely to slip and why, and suggests an action that an official approves or dismisses; the outcome is measured afterwards.
 
 ## Roles and login
 

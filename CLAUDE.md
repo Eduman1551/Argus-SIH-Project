@@ -19,6 +19,7 @@ AICTE approves technical institutions through stages such as scrutiny / re-scrut
 2. **Monitors** pendency, ageing, EVC scheduling, undertakings and document validity on role-based, real-time dashboards.
 3. **Alerts and escalates** automatically: reminders before a deadline, overdue alerts, and escalation up a configurable chain.
 4. **Records everything** in a tamper-evident audit trail.
+5. **Anticipates bottlenecks** (Proactive Approval Workflow Intelligence): predicts which cases are likely to be delayed, explains why, and recommends an intervention that a permitted official approves or dismisses.
 
 Argus is **decision support and workflow automation only**. It never approves, rejects, grants or denies anything. Statutory scrutiny, verification, inspection and decisions stay with the competent human authority.
 
@@ -75,6 +76,14 @@ Users (Institution | Official | Committee)
 
 **Alert tick (the "background worker"):** a single idempotent function `run_alert_tick(now)`. It evaluates every open case, undertaking, EVC task and document against the rules, writes new alerts into the outbox table, creates notifications, and escalates. It runs (a) on every `/api/live` poll (cheap, guarded by a "last tick" timestamp), (b) whenever the clock is advanced, and (c) from an optional `/api/cron/tick` endpoint for Vercel Cron. It must be safe to call at any time and any number of times.
 
+**Proactive approval workflow intelligence:** application submitted -> workflow processing -> delay-risk assessment -> bottleneck identification -> recommended intervention -> authorised action -> outcome tracking. Humans always decide: the system only predicts, explains and recommends.
+- **Delay risk** is transparent and rule-based, never a trained model: Risk = 100 x sum(w_i x f_i) / sum(w_i), each factor f_i in [0, 1], weights in the `risk_factors` table (time limit used 30, stage ageing 20, waiting on the institution 15, reviewer load 15, remaining work 10, repeat returns 5, dependencies 5). Bands Low / Medium / High from configurable settings (defaults 40 and 65). Projected completion = today + expected remaining stage days (configured limits adjusted by the median of recent history); projected delay = the larger of the case and current-stage gaps against their due dates.
+- It is computed inside `run_alert_tick` (stored once per case per simulated day in `risk_assessments`, so it recomputes after every clock advance) and live on read. No ML training, no paid or external AI API; the optional Groq helper may only reword the summary sentence, with the template as fallback.
+- **Bottlenecks**: projected delay grouped by stage and Region, officer and institution; top 3 with a plain sentence and main cause.
+- **Recommended interventions**: `intervention_rules` (versioned, editable by Bureau officers): priority reminder, reassign to the least-loaded eligible officer, move the visit forward, bring to the next level, request a renewed document; each with who may authorise it and an estimated days saved (labelled an estimate). One open recommendation per at-risk case, the rule with the highest estimate.
+- **Authorised action**: approving runs the existing engine action with its permission checks; only the permitted role may approve or dismiss (403 otherwise); dismissal needs a reason; recommendations, approvals, dismissals and withdrawals are all in the hash-chained audit log. Nothing runs automatically.
+- **Outcome tracking**: every approved intervention is re-measured 7 simulated days later and when the case is decided (`intervention_outcomes`); Performance shows success rate, average days saved, prediction accuracy and false-alert rate, back-tested on the stored synthetic history.
+
 **Notifications:** in-app notification centre (bell with unread count) plus a **simulated email / SMS log** in the outbox with delivery status (queued, sent, delivered, failed). No real emails or SMS in v1, and the UI labels them "simulated".
 
 **Module map**
@@ -126,6 +135,7 @@ Users (Institution | Official | Committee)
 | 17 | **Simulated clock controls** and an "Run demo scenario" guided mode | Advancing time visibly fires reminders and escalations. |
 | 18 | **All KPIs live** (section 8) | Numbers come from real data. |
 | 19 | **Tests, README, DEMO.md, smoke script** | See section 10. |
+| 20 | **Proactive approval workflow intelligence** (section 3): delay risk, bottlenecks, explainable attribution, rule-driven recommended interventions, authorised approve / dismiss, outcome tracking | Rule-based and explainable; recomputed by the tick; only a permitted official acts; outcomes and back-test on the Performance page. |
 
 ---
 
@@ -142,7 +152,7 @@ Include **scripted demo cases** (named in the data generator) that make `docs/DE
 - Integration with real AICTE systems, real SSO / DigiLocker / e-Sign, real login and password management
 - Real email, SMS and WhatsApp delivery
 - Automated document content checks (OCR, authenticity checks)
-- AI-based risk scoring or prediction of delays
+- Machine-learned delay prediction (v1 uses the transparent rule-based score above)
 - Mobile app, multilingual UI
 - Advanced analytics and cross-year trends
 - An admin / user-management role and user self-registration
@@ -227,6 +237,7 @@ Multi-page app (Next.js App Router), desktop-first, good at 1366x768 and 1920x10
 7. **Escalation ladder** (Escalations page and case page): L1 to L3, who was alerted and when, and the next level with a countdown.
 8. **Doc-style long pages** (Guide, Performance, Rules, case page) with a sticky "On this page" list, scroll-spy and callouts.
 9. **Rules page:** drag-to-reorder stage chips (arrow keys too), steppers, a live preview built from unsaved values ("would get reminders on 7 Jun, 13 Jun"), and change history from the audit trail.
+10. **Intelligence, kept small:** Official dashboard: High / Medium / Low counts, "Needs attention" (top 5 with Review) and "Where delays are building" (top 3), with the process-line stations carrying the most projected delay marked. Case page (officials): a risk pill, a "Why at risk" panel (summary sentence, top 3 reasons in points, waiting-time split that adds up to 100 percent, formulas behind "How this was calculated") and a "Recommended action" card with Approve / Dismiss and outcome notes. Institution home: only "Your reply is needed to avoid delay" with the deadline. Committee: a "Likely to be delayed" tag. Results only on /performance. Risk is always a word plus colour.
 
 **Pages**
 

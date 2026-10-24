@@ -19,6 +19,7 @@ const ROLES = [
 const TOC = [
   { id: "about", label: "About this prototype" },
   { id: "how", label: "How Argus works" },
+  { id: "intelligence", label: "Intelligence" },
   { id: "scenario", label: "Demo scenario" },
   { id: "roles", label: "Who does what" },
   { id: "controls", label: "Useful controls" },
@@ -110,6 +111,25 @@ export default function GuidePage() {
                 </div>
               ))}
             </div>
+          </Section>
+
+          <Section id="intelligence" title="Intelligence: seeing delays before they happen"
+            description="Argus predicts, explains and recommends. People decide; nothing runs by itself.">
+            <ol className="grid gap-3 md:grid-cols-2">
+              {[
+                ["Delay risk", "Every open case gets a score from 0 to 100 and a band (Low, Medium, High), worked out each simulated day from named factors such as time used, time in the current stage, waiting on the institution and workload. The weights are on the Rules page."],
+                ["Why", "The case page lists the top reasons in points and shows who the case has been waiting on, so the score is never a black box."],
+                ["Where", "The dashboard shows where projected delay is building up (by stage and Region, officer or institution) and lists the cases that need attention."],
+                ["What to do", "A configurable rule suggests one action, such as a priority reminder, a reassignment, fixing the visit date, bringing it to the next level or asking for a renewed document. Only the right official can approve or dismiss it, and both are recorded in the audit trail."],
+                ["Did it help", "Each approved action is measured again after 7 days and when the case is decided. Performance shows the success rate, days saved, prediction accuracy and false alerts."],
+                ["Honest limits", "Scores are rule-based, not machine-learned. The results come from synthetic history in which scripted people responded to actions; they show how the method behaves, not real-world impact."],
+              ].map(([k, v], i) => (
+                <li key={k} className="surface flex gap-3 p-4">
+                  <span className="mono flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-tint text-[12px] font-semibold text-brand">{i + 1}</span>
+                  <div><div className="text-[14px] font-semibold">{k}</div><p className="text-[13px] text-ink-soft">{v}</p></div>
+                </li>
+              ))}
+            </ol>
           </Section>
 
           <Section id="scenario" title="Demo scenario" description={`About 4 to 5 minutes. Run the steps in order. ${done} of ${steps.length} done.`}

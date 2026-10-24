@@ -38,6 +38,66 @@ All deadlines read time from one simulated platform clock (the date chip in the 
 +30 days, Reset). The clock moves one day at a time and runs the alert tick each day, so reminders fire on
 exactly their day.
 
+## Workflow intelligence
+
+Flow: workflow processing -> delay-risk assessment -> bottleneck identification -> recommended intervention -> authorised
+action -> outcome tracking. Code: `backend/app/intelligence/scoring.py` (pure functions, unit-tested) and
+`backend/app/intelligence/__init__.py` (database, tick, approve / dismiss, metrics).
+
+**Score.** Risk = 100 x sum(w_i x f_i) / sum(w_i). Weights (`risk_factors`, editable on the Rules page) and factors:
+
+| Factor | f (0 to 1) | Weight |
+|---|---|---|
+| Time limit used | max(working days used / days allowed to the case due date, days in stage / stage time limit) | 30 |
+| Stage ageing | days in the current stage / (1.5 x expected stage duration) | 20 |
+| Waiting on the institution | institution days / age, + 0.5 x (reply pending days / reply time limit) | 15 |
+| Reviewer load | open cases of the officer / capacity (6), or of committee members / capacity (6) | 15 |
+| Remaining work | expected remaining days / days left to the case due date (1 when past it) | 10 |
+| Repeat returns | returns so far / 3 | 5 |
+| Dependencies | 1 if the expert visit is not scheduled, or a tracked document expires before the expected decision | 5 |
+
+Bands: Low below 40, Medium 40 to 64, High 65 and above (settings `risk_band_medium`, `risk_band_high`).
+
+Tuning notes (suggested values changed because of what the synthetic data showed): the Medium band starts at 40, not 35,
+because a healthy case already scores about 30 to 40 from time used, remaining work and normal workload; capacities are 6
+because the synthetic officers carry about 3 open cases and expert members about 5 visits, so smaller capacities flagged
+everyone; and "time limit used" takes the larger of the case and stage share, because route-level slack otherwise hid
+stages that are already overdue.
+
+**Dates.** Case due date = current stage due date (moved on while the institution replies) + time limits of the later
+stages. Expected stage duration = (configured limit + median of the last 180 days of completed stages) / 2 when there are at
+least 5 of them, else the configured limit. Projected completion = today + rest of the current stage (at least one day,
+plus any reply still awaited) + expected later stages. Projected delay = the larger of (projected completion - case due)
+and (expected end of the current stage - its due date).
+
+**Waiting-time split.** Per case: institution (paused time while a deficiency is open), officials (review and decision
+stages, report review), committee (SAC/SHC, the visit and its report), scheduling (assigning members, collecting dates,
+fixing the date) and gaps. Whole percentages that add up to 100 (largest remainder).
+
+**Recommendations.** `intervention_rules`: silent institution (High and a reply pending more than N days) -> priority
+reminder; officer over capacity with another eligible officer in the Region below N percent load -> reassign; EVC stage for
+N days without a scheduled visit -> assign members / remind them / fix the earliest common date; stage over N percent of
+its expected duration -> bring to the next level (L1 to L3, a notification to that level); a document expiring before the
+expected decision -> request the renewed document. Only Medium and High cases get one; the matching rule with the highest
+estimated days saved wins; a dismissed rule is not suggested again for 14 days. Each rule edit bumps its version, and a
+recommendation keeps the version it came from.
+
+**Approve / dismiss.** `POST /api/interventions/{id}/approve` runs the action through the existing engine functions
+(their permission checks apply too); `POST /api/interventions/{id}/dismiss` needs a reason. Who may act: `regional`
+(officials of the case's Region), `regional_or_bureau`, `bureau`. Everyone else gets 403.
+
+**Outcomes and results.** For approved actions: score and projected delay before; re-measured 7 simulated days later and
+when the case is decided (days saved = delay before - delay after; on time when decided by its due date). Back-test on the
+stored daily assessments: a case is late if a stage finished (or is still open) after its due date; predicted late if it
+was High on or before that date. In the synthetic history scripted officers approved or dismissed recommendations and
+scripted institutions and officers responded (for example a reply 2 to 4 days after a priority reminder), so the results
+show how the method behaves on this data, not real-world impact.
+
+**Endpoints.** `GET /api/intelligence/overview|watchlist|bottlenecks|recommendations|metrics`,
+`GET /api/applications/{id}/risk|assessments|summary-wording`, `POST /api/interventions/{id}/approve|dismiss`,
+`PUT /api/rules/risk-factors/{code}`, `PUT /api/rules/interventions/{code}`. Migration: `pnpm db:seed` reloads the schema
+and the regenerated dataset.
+
 ## Sign-in and sign-out
 
 Sign-in is a demo user picker at `/login`, grouped by role. Picking a user calls `POST /api/auth/login`,
@@ -119,7 +179,7 @@ Synthetic data throughout.
 - Integration with real AICTE systems, real SSO, DigiLocker and e-Sign, real login and password management
 - Real email, SMS and WhatsApp delivery
 - Automated document content checks (OCR, authenticity checks)
-- AI-based risk scoring or prediction of delays
+- Machine-learned delay prediction (v1 uses the transparent rule-based score)
 - Mobile app and multilingual UI
 - Advanced analytics and cross-year trends
 - An admin / user-management role and self-registration

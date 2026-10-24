@@ -105,3 +105,21 @@ expired with no renewal, Oakhaven's fire NOC renewal waiting for verification.
 
 Avatar menu → **Log out**. You are back on the sign-in page; opening any page (for example `/queue`) sends
 you there again, and the API answers 401. Sign in as a different role: only that role's pages and data show.
+
+## Intelligence: from risk to outcome (90 s, start from Reset)
+
+Numbers below are what the seeded data gives after Reset; they come from the engine, not from this script.
+
+1. As **Arjun Wrenfield** → **Overview**. Next to the metrics: **Needs attention** (High / Medium / Low counts and up to
+   five cases with a recommended action) and **Where delays are building** (top 3). On the process line, the stations
+   carrying the most projected delay are marked "delay building".
+2. Open **ARG/2026/NR/0047** (Brightwater, Scrutiny): the pill says **Medium risk 64**.
+3. Date chip → **+7 days**. Open NR/0047 again: now **High risk 67**. **Why at risk** gives the reasons in points
+   (time limit used, 25 days at Scrutiny, remaining work), where the time went, and "How this was calculated".
+4. **Recommended action**: "Stage taking too long: bring the case to the next level", with the reason and the estimated
+   days saved. Press **Approve**: the case is brought to the next level (L2). The approval is in the timeline and the
+   audit trail with your name. (Try it as Kavya or Prof. Duskwood: they cannot see or approve it.)
+5. Still as Arjun, **Complete scrutiny**. The case moves to the expert visit and the risk drops to **Low**.
+6. Date chip → **+7 days**. The case page now shows the outcome under the action: risk 67 → about 37, about 5 days saved.
+   **Performance** → *Intelligence results* shows the success rate, days saved, prediction accuracy and false alerts.
+

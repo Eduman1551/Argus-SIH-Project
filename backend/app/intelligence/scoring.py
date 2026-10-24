@@ -86,6 +86,7 @@ class Assessment:
     projected_delay: int
     remaining_days: int
     allowed_days: int
+    stage_late: int = 0               # days the current stage is expected to finish after its own due date
     reasons: list[dict] = field(default_factory=list)
     summary: str = ""
 
@@ -239,6 +240,10 @@ def summary(inp: CaseInputs, a: Assessment) -> str:
     """One plain sentence, written from a template (the AI helper may reword it, never change it)."""
     top = a.reasons[0]["text"].lower() if a.reasons else "no single cause"
     if a.band == "high":
+        if a.stage_late and a.stage_late >= a.projected_delay:
+            return (f"{inp.ref_no} is at high risk: {inp.stage_name} is expected to finish about {a.stage_late} days "
+                    f"after its due date of {fmt_date(inp.stage_due)}, with the decision around "
+                    f"{fmt_date(a.projected_completion)}. Main reason: {top}.")
         late = f", about {a.projected_delay} days late" if a.projected_delay else ""
         return (f"{inp.ref_no} is at high risk of missing its due date of {fmt_date(a.case_due)}: the expected "
                 f"decision is around {fmt_date(a.projected_completion)}{late}. Main reason: {top}.")
@@ -256,7 +261,8 @@ def assess(inp: CaseInputs, cfg: Config, top_n: int = 3) -> Assessment:
     value = score(f, cfg.weights)
     a = Assessment(app_id=inp.app_id, score=value, band=band(value, cfg), factors={k: round(v, 3) for k, v in f.items()},
                    points={k: round(v, 1) for k, v in pts.items()}, projected_completion=completion, case_due=due,
-                   projected_delay=delay, remaining_days=remaining, allowed_days=allowed_days(inp, cfg))
+                   projected_delay=delay, remaining_days=remaining, allowed_days=allowed_days(inp, cfg),
+                   stage_late=max(0, (inp.today + timedelta(days=stage_rest(inp, cfg)) - inp.stage_due).days))
     ranked = sorted((k for k in FACTOR_ORDER if pts[k] >= 0.5), key=lambda k: (-pts[k], FACTOR_ORDER.index(k)))
     a.reasons = [{"code": k, "label": FACTOR_LABELS[k], "points": int(round(pts[k])),
                   "text": reason_text(k, inp, cfg, completion, due, remaining)} for k in ranked[:top_n]]
