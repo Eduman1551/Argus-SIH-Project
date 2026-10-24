@@ -3,9 +3,13 @@ and its audit entry commit together. Scope is enforced here and in the engines."
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import date
+from functools import lru_cache
 
 from fastapi import APIRouter, File, Form, Query, Request, Response, UploadFile
 from fastapi.responses import JSONResponse
@@ -32,7 +36,7 @@ from app.common import Invalid, NotAllowed, NotFound, ensure
 from app.config import get_settings
 from app.workflow import committee
 from app.workflow.facts import case_facts
-from db import Conn, transaction
+from db import SCHEMA_PATH, Conn, transaction
 
 router = APIRouter(prefix="/api")
 
@@ -54,11 +58,35 @@ class SessionIn(BaseModel):
     user_id: int
 
 
+@lru_cache
+def _schema_version() -> str:
+    return hashlib.sha256(SCHEMA_PATH.read_bytes()).hexdigest()[:12]
+
+
 @router.get("/health")
 def health():
+    """Database reachable, schema version and whether every table exists. No secrets, no row data."""
+    from app.data.snapshot import TABLES
+
     with transaction() as c:
-        c.val("SELECT 1")
-    return {"ok": True, "llm": llm.llm_available()}
+        present = c.val("SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' "
+                        "AND table_name = ANY(%s)", (TABLES,))
+        seeded = c.val("SELECT count(*) FROM applications") > 0
+    return {"ok": True, "db": "connected", "schema_version": _schema_version(),
+            "schema_ok": present == len(TABLES), "seeded": seeded, "llm": llm.llm_available()}
+
+
+def _https(request: Request) -> bool:
+    """Behind Vercel the app sees plain HTTP; the original scheme is in x-forwarded-proto."""
+    return request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
+
+
+def _cron_allowed(request: Request) -> bool:
+    """Bearer CRON_SECRET. Without a secret only local development may call the cron endpoints."""
+    secret = get_settings().cron_secret
+    if not secret:
+        return not os.environ.get("VERCEL")
+    return hmac.compare_digest(request.headers.get("authorization", ""), f"Bearer {secret}")
 
 
 @router.get("/users/demo")
@@ -83,26 +111,26 @@ def get_session(request: Request):
 
 
 @router.post("/session")
-def set_session(body: SessionIn, response: Response):
+def set_session(body: SessionIn, request: Request, response: Response):
     with transaction() as c:
         user = c.one("SELECT id FROM users WHERE id = %s", (body.user_id,))
         if user is None:
             raise NotFound("Unknown demo user.")
     response.set_cookie(COOKIE, sign(body.user_id), httponly=True, samesite="lax", max_age=60 * 60 * 24 * 30,
-                        secure=False, path="/")
+                        secure=_https(request), path="/")
     return {"ok": True}
 
 
 @router.post("/auth/login")
-def login(body: SessionIn, response: Response):
-    return set_session(body, response)
+def login(body: SessionIn, request: Request, response: Response):
+    return set_session(body, request, response)
 
 
 @router.post("/auth/logout")
 @router.delete("/session")
-def end_session(response: Response):
+def end_session(request: Request, response: Response):
     """Log out: expire the session cookie. Every protected endpoint answers 401 afterwards."""
-    response.delete_cookie(COOKIE, path="/", httponly=True, samesite="lax")
+    response.delete_cookie(COOKIE, path="/", httponly=True, samesite="lax", secure=_https(request))
     return {"ok": True}
 
 
@@ -151,11 +179,24 @@ def demo_reset(request: Request):
 
 @router.get("/cron/tick")
 def cron_tick(request: Request):
-    secret = get_settings().cron_secret
-    if secret and request.headers.get("authorization") != f"Bearer {secret}":
+    if not _cron_allowed(request):
         return JSONResponse({"detail": "Unauthorised"}, status_code=401)
     with transaction() as c:
         return run_alert_tick(c, clock.now(c))
+
+
+@router.post("/cron/reset")
+def cron_reset(request: Request):
+    """Restore the seeded demo data from outside the app (scripts/reset-live.mjs). Same CRON_SECRET guard."""
+    from app.data.snapshot import restore
+
+    if not _cron_allowed(request):
+        return JSONResponse({"detail": "Unauthorised"}, status_code=401)
+    with transaction() as c:
+        restore(c)
+        record(c, at=clock.now(c), actor=None, action="demo.reset", entity_type="dataset", entity_id="synthetic",
+               details={"requested_by": "reset script"})
+        return {"ok": True, "clock": clock.state(c)}
 
 
 # ================================================================== dashboards

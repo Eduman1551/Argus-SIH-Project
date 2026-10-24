@@ -201,3 +201,47 @@ def test_demo_scenario_runs_end_to_end(api):
     assert api.post("/api/demo/scenario/2").status_code == 409  # out of order after the run
     assert api.post("/api/demo/reset").status_code == 200
     assert api.get("/api/clock").json()["today"] == "2026-05-15"
+
+
+def test_health_reports_schema_without_secrets(api):
+    body = api.get("/api/health").json()
+    assert body["db"] == "connected" and body["schema_ok"] and body["seeded"] and len(body["schema_version"]) == 12
+    from app.config import get_settings
+
+    text = api.get("/api/health").text
+    assert get_settings().database_url not in text and get_settings().session_secret not in text
+
+
+def _cron_secret(monkeypatch, value: str):
+    from dataclasses import replace
+
+    from app.config import get_settings
+
+    settings = replace(get_settings(), cron_secret=value)
+    monkeypatch.setattr("app.api.routes.get_settings", lambda: settings)
+
+
+def test_cron_endpoints_need_the_secret(api, monkeypatch):
+    _cron_secret(monkeypatch, "test-secret")
+    assert api.get("/api/cron/tick").status_code == 401
+    assert api.get("/api/cron/tick", headers={"Authorization": "Bearer wrong"}).status_code == 401
+    assert api.post("/api/cron/reset").status_code == 401
+    ok = {"Authorization": "Bearer test-secret"}
+    assert api.get("/api/cron/tick", headers=ok).status_code == 200
+    assert api.get("/api/cron/tick", headers=ok).json()["alerts"] == 0  # idempotent: nothing new the second time
+    assert api.post("/api/cron/reset", headers=ok).status_code == 200
+
+
+def test_cron_is_closed_on_vercel_without_a_secret(api, monkeypatch):
+    _cron_secret(monkeypatch, "")
+    monkeypatch.setenv("VERCEL", "1")
+    assert api.get("/api/cron/tick").status_code == 401
+
+
+def test_session_cookie_is_secure_on_https(api):
+    uid = api.users["off-NR-1"]
+    r = api.post("/api/auth/login", json={"user_id": uid}, headers={"x-forwarded-proto": "https"})
+    cookie = r.headers["set-cookie"].lower()
+    assert "httponly" in cookie and "samesite=lax" in cookie and "secure" in cookie
+    out = api.post("/api/auth/logout", headers={"x-forwarded-proto": "https"}).headers["set-cookie"].lower()
+    assert "max-age=0" in out or "expires=thu, 01 jan 1970" in out
