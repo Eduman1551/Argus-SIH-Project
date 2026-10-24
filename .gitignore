@@ -24,3 +24,7 @@ next-env.d.ts
 .vercel/
 /screenshots/
 *.log
+
+.vercel
+.env*
+!.env.example
