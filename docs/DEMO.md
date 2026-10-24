@@ -1,8 +1,24 @@
 # Argus demo script (4 to 5 minutes)
 
-Start the app with `pnpm dev` and open **http://localhost:3001** (the API answers on
-http://localhost:8001/api/health; both ports can be changed with `WEB_PORT` / `API_PORT` in `.env`).
-With no session you land on the **sign-in page** (`/login`): pick a demo user to sign in.
+Open the live site **https://argus-sih-2026.vercel.app**, or run it locally with `pnpm dev` and open
+**http://localhost:3001** (API on http://localhost:8001/api/health; ports can be changed with `WEB_PORT` /
+`API_PORT` in `.env`). With no session you land on the **sign-in page** (`/login`): pick a demo user.
+
+**Demo logins** (one click each on the sign-in page, no password):
+
+| Role | User |
+|---|---|
+| Institution | Dr. Kavya Larkspur (Ambervale Institute of Technology); Dr. Aarav Yarrowby (Ironwood) |
+| Regional officer | Arjun Wrenfield (Assistant Director, Northern Region) |
+| Competent authority | Dr. Nandini Hazelbrook (Regional Director, Northern Region) |
+| Bureau officer | Ritu Emberly (Bureau Head; the only role that edits Rules) |
+| EVC member | Prof. Vikram Duskwood |
+| SAC/SHC member | Dr. Sana Thistledown |
+
+**Clean start.** Everyone who opens the live site shares one demo dataset and one simulated clock. Before a
+demo, press **Reset** in the date chip (as any official), or run `pnpm reset:live https://argus-sih-2026.vercel.app`
+from your machine (uses `CRON_SECRET` from `.env`). Both restore the seeded data, the clock (15 May 2026) and the
+audit log.
 
 Everything below uses the scripted cases in the synthetic dataset, so it works the same every time.
 Before you start, open the **date chip** in the navbar and press **Reset**, so the simulated date is

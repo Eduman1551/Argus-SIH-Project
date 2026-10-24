@@ -327,15 +327,34 @@ Names are invented: imaginary towns, and person surnames that are unusual nature
 
 ## Deploying on Vercel
 
-1. Create a Neon database and run `pnpm db:init` and `pnpm db:seed` against it from your machine
-   (`DATABASE_URL` in `.env`). Use Neon's pooled connection string for the deployed app.
-2. Import the GitHub repo in Vercel. `vercel.json` defines two services: `web` (Next.js in `frontend/`)
-   and `api` (FastAPI, `backend/app/main.py`, dependencies in the root `requirements.txt`), with `/api/*`
-   routed to the API. If your Vercel account does not offer services yet, set the project's Root Directory
-   to `frontend`, deploy the API as a second project from `backend/`, and set `ARGUS_API_ORIGIN` on the web
-   project to the API's URL (the Next.js rewrite then proxies `/api`).
-3. Set `DATABASE_URL`, `SESSION_SECRET`, optionally `GROQ_API_KEY`, `LLM_MODEL` and `CRON_SECRET` in the
-   Vercel project settings. Never commit `.env`.
+Live at **https://argus-sih-2026.vercel.app** (Vercel project `argus-sih`, region `sin1`, next to the Neon
+database in Singapore). Every push to `main` deploys to production.
+
+- **One project, one origin.** `vercel.json` defines two services: `web` (Next.js in `frontend/`) and `api`
+  (FastAPI as one Python function, `api/index.py`, which puts `backend/` on the path). `/api/*` goes to the API,
+  everything else to Next.js, so the browser only calls relative `/api` paths: no API URL, no CORS. Runtime
+  packages are the five in the root `requirements.txt`. Keep `pyproject.toml` out of the repo root: Vercel reads
+  dependencies from it when present (tool settings live in `ruff.toml` and `pytest.ini`).
+- **Database.** `pnpm db:init` (creates tables only if missing; safe to repeat) and `pnpm db:seed` (reloads the
+  committed synthetic dataset and the Reset snapshot) run from your machine against the same `DATABASE_URL`.
+  Use Neon's pooled connection string; connections are short-lived with a tiny idle cache, and prepared
+  statements are off so the pooler is safe.
+- **Environment variables** (Vercel project settings, production and preview): `DATABASE_URL`,
+  `SESSION_SECRET`, `CRON_SECRET`, optionally `GROQ_API_KEY` and `LLM_MODEL`. Never commit `.env`.
+- **Session cookie.** HttpOnly, SameSite=Lax, and Secure on HTTPS (detected from `x-forwarded-proto`);
+  Log out expires it.
+- **Scheduled tick.** A daily Vercel Cron (Hobby plan limit) calls `GET /api/cron/tick` with
+  `Authorization: Bearer CRON_SECRET`. Without a secret on Vercel the cron endpoints refuse every call. The
+  date-chip controls and every `/api/live` poll run the same idempotent tick, so the demo never waits for cron.
+- **Health and reset.** `GET /api/health` reports the database connection, the schema version (hash of
+  `schema.sql`), whether every table exists and whether data is loaded; no secrets. `pnpm reset:live <url>` calls
+  `POST /api/cron/reset` (same secret) to restore the demo; Reset in the date chip does the same for officials.
+- **Checks.** `pnpm live-test <url>` runs the full role-by-role test against a deployment (results in
+  `test-results/live/`); `pnpm shots:prod <url>` refreshes `screenshots/production/`. See
+  [TEST_REPORT.md](TEST_REPORT.md).
+- **Limits.** Function timeout 60 s (a +30 day advance takes about 3 s); request bodies up to about 4.5 MB
+  (documents stay at 2 MB); all viewers share one dataset and one simulated clock; Hobby keeps about an
+  hour of runtime logs.
 
 Nothing in the app keeps state in memory or needs a long-running process: all state is in PostgreSQL and
 the alert tick runs inside requests.

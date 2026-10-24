@@ -3,7 +3,7 @@
 Argus helps AICTE officers, institutions and expert committees track approval cases, deadlines and
 undertakings in one place, so nothing slips through unnoticed. Built for SIH 2026, problem statement PS26262.
 
-**Live demo:** not deployed yet (the Vercel link goes here once it is).
+**Live demo:** https://argus-sih-2026.vercel.app (pick a demo user on the sign-in page).
 
 > Prototype, not an official AICTE system. **All data is synthetic**: every institution, person and case is
 > fictional, and the rules and time limits are illustrative, not official APH figures.
@@ -61,7 +61,7 @@ Never commit `.env`; `.env.example` lists the names.
 
 ## Deploy
 
-One Vercel project (Next.js plus the FastAPI function) with a Neon database; see `vercel.json`.
+One Vercel project (Next.js plus the FastAPI function) with a Neon database; pushes to `main` deploy automatically. Details in [docs/DETAILS.md](docs/DETAILS.md#deploying-on-vercel).
 
 ## More
 
