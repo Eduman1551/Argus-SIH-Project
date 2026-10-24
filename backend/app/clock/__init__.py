@@ -78,14 +78,16 @@ def advance(conn: Conn, days: int, actor: dict | None) -> dict:
     totals = {"alerts": 0, "escalations": 0, "notifications": 0, "reminders": 0, "overdue": 0,
               "escalated_l1": 0, "escalated_l2": 0, "escalated_l3": 0}
     # Finish the current day first, so anything created today gets its same-day reminders.
-    first = run_alert_tick(conn, start)
+    # The delay-risk assessment runs in full on the last day only (one stored assessment per advance);
+    # the days in between still measure any outcome checkpoint that falls due on them.
+    first = run_alert_tick(conn, start, assess=False)
     for k in totals:
         totals[k] += first.get(k, 0)
     for i in range(1, days + 1):
         current = start + timedelta(days=i)
         set_now(conn, current)
         # time passing alone never closes an item, so escalation clean-up already ran in the first tick
-        result = run_alert_tick(conn, current, resolve=False)
+        result = run_alert_tick(conn, current, resolve=False, assess=i == days)
         for k in totals:
             totals[k] += result.get(k, 0)
     end = now(conn)

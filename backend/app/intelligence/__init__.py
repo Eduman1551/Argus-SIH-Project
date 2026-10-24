@@ -189,10 +189,21 @@ def _store(conn: Conn, now: datetime, pairs: list[tuple[S.CaseInputs, S.Assessme
 
 
 # ------------------------------------------------------------------ the tick
-def on_tick(conn: Conn, now: datetime, only_if_missing: bool = False) -> dict:
+def on_tick(conn: Conn, now: datetime, only_if_missing: bool = False, light: bool = False) -> dict:
     """Assess, store, refresh recommendations and measure outcomes. Idempotent: the assessment is upserted
-    per (case, day), at most one recommendation is open per case, and each outcome checkpoint is written once."""
+    per (case, day), at most one recommendation is open per case, and each outcome checkpoint is written once.
+    `light` only measures the outcome checkpoints due today (used for the days a clock advance passes through)."""
     today = ist_date(now)
+    if light:
+        # the days that hold a day-7 checkpoint are read once per transaction (a clock advance is one)
+        if "outcome_days" not in conn.cache:
+            conn.cache["outcome_days"] = {r["d"] for r in conn.all(
+                """SELECT ist_date(i.decided_at) + 7 AS d FROM interventions i WHERE i.status = 'approved'
+                     AND NOT EXISTS (SELECT 1 FROM intervention_outcomes o WHERE o.intervention_id = i.id
+                                       AND o.checkpoint = 'day7')""")}
+        if today not in conn.cache["outcome_days"]:
+            return {"assessed": 0, "measured": 0}
+        return {"assessed": 0, "measured": measure_outcomes(conn, now, None)}
     if only_if_missing and conn.val("SELECT EXISTS (SELECT 1 FROM risk_assessments WHERE assessed_on = %s)", (today,)):
         return {"assessed": 0}
     pairs = assess(conn, now)
@@ -259,8 +270,9 @@ def _withdraw(conn: Conn, now: datetime, rec: dict, why: str) -> None:
 
 
 # ------------------------------------------------------------------ outcomes
-def measure_outcomes(conn: Conn, now: datetime, current: dict[int, S.Assessment]) -> int:
-    """Re-measure approved interventions: 7 simulated days after approval, and when the case is decided."""
+def measure_outcomes(conn: Conn, now: datetime, current: dict[int, S.Assessment] | None) -> int:
+    """Re-measure approved interventions: 7 simulated days after approval, and when the case is decided.
+    With `current=None` the cases that need a day-7 measurement are assessed here (only those)."""
     today = ist_date(now)
     rows = conn.all(
         """SELECT i.id, i.application_id, i.decided_at, i.score_before, i.delay_before, i.case_due_before,
@@ -275,6 +287,10 @@ def measure_outcomes(conn: Conn, now: datetime, current: dict[int, S.Assessment]
              AND (NOT EXISTS (SELECT 1 FROM intervention_outcomes o WHERE o.intervention_id = i.id AND o.checkpoint = 'day7')
                OR NOT EXISTS (SELECT 1 FROM intervention_outcomes o WHERE o.intervention_id = i.id
                                 AND o.checkpoint = 'completion'))""")
+    if current is None:
+        due7 = [r["application_id"] for r in rows if not r["has7"] and r["app_status"] == "in_progress"
+                and today >= ist_date(r["decided_at"]) + timedelta(days=7)]
+        current = {a.app_id: a for _, a in assess(conn, now, due7)} if due7 else {}
     written = 0
     for r in rows:
         decided = ist_date(r["app_decided_at"]) if r["app_decided_at"] else None
