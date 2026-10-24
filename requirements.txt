@@ -1,1 +1,7 @@
-﻿-r backend/requirements.txt
+# Runtime dependencies of the Argus API (what Vercel installs for the Python function).
+# Development extras (server, tests, lint) are in requirements-dev.txt.
+fastapi==0.161.1
+pydantic==2.14.1
+psycopg[binary]==3.3.6
+python-multipart==0.0.32
+groq==1.7.0

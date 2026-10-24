@@ -330,7 +330,7 @@ Names are invented: imaginary towns, and person surnames that are unusual nature
 1. Create a Neon database and run `pnpm db:init` and `pnpm db:seed` against it from your machine
    (`DATABASE_URL` in `.env`). Use Neon's pooled connection string for the deployed app.
 2. Import the GitHub repo in Vercel. `vercel.json` defines two services: `web` (Next.js in `frontend/`)
-   and `api` (FastAPI, `backend/app/main.py`, dependencies in `backend/requirements.txt`), with `/api/*`
+   and `api` (FastAPI, `backend/app/main.py`, dependencies in the root `requirements.txt`), with `/api/*`
    routed to the API. If your Vercel account does not offer services yet, set the project's Root Directory
    to `frontend`, deploy the API as a second project from `backend/`, and set `ARGUS_API_ORIGIN` on the web
    project to the API's URL (the Next.js rewrite then proxies `/api`).
