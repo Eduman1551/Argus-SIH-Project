@@ -121,7 +121,7 @@ export function RecommendedAction({ risk }: { risk: CaseRisk }) {
   const approve = async () => {
     if (!rec) return;
     setBusy(true);
-    const r = await act<{ done?: string }>(`/api/interventions/${rec.id}/approve`, {});
+    const r = await act<{ done?: string }>(`/api/interventions/${rec.id}/accept`, {});
     if (r) useApp.getState().toast("success", `Approved. ${r.done ?? ""}`.trim());
     setBusy(false);
   };

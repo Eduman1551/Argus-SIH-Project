@@ -213,7 +213,7 @@ def summary_wording(app_id: int, request: Request):
 
 
 # ------------------------------------------------------------------ authorised actions
-@router.post("/interventions/{iid}/approve")
+@router.post("/interventions/{iid}/accept")
 def approve(iid: int, body: ApproveIn, request: Request):
     with tx(request) as (c, user):
         result = intelligence.approve(c, clock.now(c), user, iid, body.note)

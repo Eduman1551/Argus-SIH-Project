@@ -271,17 +271,17 @@ def test_full_flow_predict_explain_recommend_authorise_audit(api):
     assert cr_rec and not cr_rec["can_act"]
 
     # nobody else may act on it: another Region, a committee member, the institution
-    assert api.post(f"/api/interventions/{cr_rec['id']}/approve", json={}).status_code == 403
+    assert api.post(f"/api/interventions/{cr_rec['id']}/accept", json={}).status_code == 403
     for code in ("evc-1", "inst-AMB"):
         api.login(code)
-        assert api.post(f"/api/interventions/{rec['id']}/approve", json={}).status_code == 403
+        assert api.post(f"/api/interventions/{rec['id']}/accept", json={}).status_code == 403
         assert api.get(f"/api/applications/{nr}/risk").status_code == 403
 
     api.login("off-NR-1")
     assert api.post(f"/api/interventions/{cr_rec['id']}/dismiss", json={"reason": "short"}).status_code == 422
-    r = api.post(f"/api/interventions/{rec['id']}/approve", json={"note": "Lease renewal needed before the visit."})
+    r = api.post(f"/api/interventions/{rec['id']}/accept", json={"note": "Lease renewal needed before the visit."})
     assert r.status_code == 200 and r.json()["done"]
-    assert api.post(f"/api/interventions/{rec['id']}/approve", json={}).status_code == 409
+    assert api.post(f"/api/interventions/{rec['id']}/accept", json={}).status_code == 409
 
     api.login("bureau-head")
     assert api.post(f"/api/interventions/{cr_rec['id']}/dismiss",
