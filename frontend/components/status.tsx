@@ -29,3 +29,15 @@ export function VisitStamp({ v }: { v: Visit }) {
   if (v.category === "completed") return <Stamp tone="closed">Completed</Stamp>;
   return <Stamp tone="neutral">{EVC_CATEGORY[v.category] ?? v.category}</Stamp>;
 }
+
+const RISK_WORD = { high: "High risk", medium: "Medium risk", low: "Low risk" } as const;
+
+/** Delay risk as a word and a colour (never colour alone), with the score when given. */
+export function RiskPill({ band, score }: { band: "low" | "medium" | "high"; score?: number | null }) {
+  const tone = band === "high" ? "overdue" : band === "medium" ? "soon" : "ok";
+  return (
+    <Stamp tone={tone}>
+      {RISK_WORD[band]}{score != null && <span className="mono">{score}</span>}
+    </Stamp>
+  );
+}

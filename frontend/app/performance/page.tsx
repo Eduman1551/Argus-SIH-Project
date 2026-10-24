@@ -40,11 +40,13 @@ const TOC = [
   { id: "results", label: "Results" },
   { id: "selftest", label: "Routing self-test" },
   { id: "stage-time", label: "Time per stage" },
+  { id: "intelligence", label: "Intelligence results" },
   { id: "method", label: "How it is measured" },
 ];
 
 export default function PerformancePage() {
   const { data, error, loading, reload } = useApi<{ as_of: string; note: string; kpis: Kpi[] }>("/api/kpi");
+  const intel = useApi<IntelMetrics>("/api/intelligence/metrics");
   const [test, setTest] = useState<SelfTest | null>(null);
   const [running, setRunning] = useState(false);
   if (loading) return <PageSkeleton />;
@@ -130,6 +132,11 @@ export default function PerformancePage() {
           </div>
         </Section>
 
+        <Section id="intelligence" title="Intelligence results"
+          description="How well the delay-risk predictions and the recommended actions work, measured on the synthetic history.">
+          {intel.data ? <IntelResults m={intel.data} /> : <div className="skeleton h-[120px]" />}
+        </Section>
+
         <Section id="method" title="How each KPI is measured">
           <div className="surface px-4 py-2">
             <Collapsible title="Show the method">
@@ -151,6 +158,43 @@ export default function PerformancePage() {
         </div>
       </DocLayout>
       <NextStep href="/guide" label="guide and demo scenario" />
+    </div>
+  );
+}
+
+interface IntelMetrics {
+  interventions: { approved: number; dismissed: number; open: number; measured: number; succeeded: number;
+    success_rate: number | null; avg_days_saved: number | null };
+  backtest: { cases: number; late: number; predicted_high: number; true_positive: number; false_positive: number;
+    false_negative: number; true_negative: number; accuracy: number | null; false_alert_rate: number | null;
+    late_caught: number | null };
+  note: string;
+}
+
+function IntelResults({ m }: { m: IntelMetrics }) {
+  const i = m.interventions;
+  const b = m.backtest;
+  const show = (v: number | null, unit = "%") => (v == null ? "–" : `${v}${unit}`);
+  return (
+    <div className="surface p-4">
+      <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          ["Intervention success", show(i.success_rate), `${i.succeeded} of ${i.measured} measured actions lowered the risk or finished on time`],
+          ["Average days saved", show(i.avg_days_saved, " days"), "Projected delay before the action minus the delay measured after"],
+          ["Prediction accuracy", show(b.accuracy), `${b.true_positive + b.true_negative} of ${b.cases} cases with a known outcome predicted correctly`],
+          ["False-alert rate", show(b.false_alert_rate), `${b.false_positive} of ${b.predicted_high} High warnings finished on time`],
+        ].map(([label, value, hint]) => (
+          <div key={label}>
+            <dt className="text-[12px] font-medium text-ink-soft">{label}</dt>
+            <dd className="mono mt-1 text-[24px] font-semibold leading-none tracking-[-0.02em]">{value}</dd>
+            <dd className="mt-1.5 text-[12px] text-ink-soft">{hint}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-4 border-t border-line pt-3 text-[12px] text-ink-soft">
+        {m.note} Late cases caught early: {show(b.late_caught)}. Recommendations so far: {i.approved} approved, {i.dismissed} dismissed,
+        {" "}{i.open} open.
+      </p>
     </div>
   );
 }

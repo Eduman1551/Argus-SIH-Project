@@ -23,6 +23,9 @@ interface Rules {
   settings: { key: string; value: number; label: string; description: string }[];
   entity_types: { code: string; label: string }[];
   escalation_targets: { code: string; label: string }[];
+  risk_factors: { code: string; label: string; weight: number; description: string }[];
+  intervention_rules: { id: number; code: string; label: string; trigger_text: string; action: string; action_text: string;
+    authorized_by: string; threshold: number; threshold_label: string; est_days_saved: number; active: boolean; version: number }[];
 }
 interface Change { id: number; at: string; actor_label: string; entity_id: string; details: { rule?: string; key?: string; before?: unknown; after?: unknown } }
 
@@ -80,6 +83,8 @@ const TOC = [
   { id: "limits", label: "Time limits" },
   { id: "reminders", label: "Reminders" },
   { id: "escalation", label: "Escalation chain" },
+  { id: "risk", label: "Delay risk" },
+  { id: "actions", label: "Recommended actions" },
   { id: "templates", label: "Message templates" },
   { id: "settings", label: "Other settings" },
   { id: "history", label: "Change history" },
@@ -168,6 +173,24 @@ export default function RulesPage() {
                 })}</ul>
               </Card>
             </div>
+          </Section>
+
+          <Section id="risk" title="Delay risk"
+            description="How much each factor counts in the delay-risk score (0 to 100). Bands and capacities are under Other settings.">
+            <Card pad={false}>
+              <ul className="divide-y divide-line">{data.risk_factors.map((f) => (
+                <WeightRow key={`${f.code}${f.weight}`} f={f} total={data.risk_factors.reduce((t, x) => t + x.weight, 0)} ro={ro} />
+              ))}</ul>
+            </Card>
+          </Section>
+
+          <Section id="actions" title="Recommended actions"
+            description="When a case is at risk, the best matching rule suggests an action. A permitted official approves or dismisses it; nothing runs by itself.">
+            <Card pad={false}>
+              <ul className="divide-y divide-line">{data.intervention_rules.map((r) => (
+                <InterventionRow key={`${r.code}${r.version}`} r={r} ro={ro} />
+              ))}</ul>
+            </Card>
           </Section>
 
           <Section id="templates" title="Message templates" description="Placeholders in braces, such as {ref} or {due_date}, are filled in automatically. Emails and SMS are simulated.">
@@ -397,6 +420,52 @@ function EscDaysRow({ e, days, ro, due }: { e: { code: string; label: string }; 
         If still open after a due date of <span className="mono">{short(due)}</span>: {v.map((d, i) => <span key={i}><b className="font-medium text-esc">L{i + 1}</b> <span className="mono text-ink">{short(addDays(due, d))}</span>{i < v.length - 1 ? ", " : "."}</span>)}
         {v.some((d, i) => i > 0 && d <= v[i - 1]) && <span className="ml-1 font-medium text-warn-ink">Each level should come after the one before.</span>}
       </Preview>
+    </li>
+  );
+}
+
+const AUTH: Record<string, string> = { regional: "Regional officer", regional_or_bureau: "Regional or Bureau officer", bureau: "Bureau officer" };
+
+function WeightRow({ f, total, ro }: { f: Rules["risk_factors"][number]; total: number; ro: boolean }) {
+  const [w, setW] = useState(f.weight);
+  return (
+    <li className="grid items-center gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_auto]">
+      <div><div className="text-[13.5px] font-medium">{f.label}</div><div className="text-[12.5px] text-ink-soft">{f.description}</div></div>
+      <span className="flex items-center gap-2">
+        <span className="mono w-[64px] text-right text-[12px] text-ink-soft">{total ? Math.round((100 * f.weight) / total) : 0}% now</span>
+        <Stepper value={w} onChange={setW} min={0} max={100} disabled={ro} label={`${f.label} weight`} suffix="pts" />
+        <SaveBar dirty={w !== f.weight} onReset={() => setW(f.weight)}
+          onSave={() => void save(`/api/rules/risk-factors/${f.code}`, { weight: w }, `${f.label}: weight ${w}.`)} />
+      </span>
+    </li>
+  );
+}
+
+function InterventionRow({ r, ro }: { r: Rules["intervention_rules"][number]; ro: boolean }) {
+  const [active, setActive] = useState(r.active);
+  const [threshold, setThreshold] = useState(r.threshold);
+  const [saved, setSaved] = useState(r.est_days_saved);
+  const dirty = active !== r.active || threshold !== r.threshold || saved !== r.est_days_saved;
+  return (
+    <li className="px-4 py-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 text-[13.5px] font-medium">{r.label}
+            <span className="mono text-[11.5px] font-normal text-ink-soft">v{r.version}</span>
+            {!r.active && <Stamp tone="neutral">Off</Stamp>}</div>
+          <div className="text-[12.5px] text-ink-soft">When: {r.trigger_text}. Then: {r.action_text.charAt(0).toLowerCase() + r.action_text.slice(1)}. Approved by: {AUTH[r.authorized_by]}.</div>
+        </div>
+        <SaveBar dirty={dirty} onReset={() => { setActive(r.active); setThreshold(r.threshold); setSaved(r.est_days_saved); }}
+          onSave={() => void save(`/api/rules/interventions/${r.code}`, { active, threshold, est_days_saved: saved }, `${r.label} updated (version ${r.version + 1}).`)} />
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] text-ink-soft">
+        <label className="flex items-center gap-1.5"><input type="checkbox" className="accent-[var(--brand)]" checked={active} disabled={ro}
+          onChange={(e) => setActive(e.target.checked)} /> On</label>
+        <span className="flex items-center gap-1.5">N = {r.threshold_label.toLowerCase()}
+          <Stepper value={threshold} onChange={setThreshold} min={0} max={365} disabled={ro} label={`${r.label} threshold`} /></span>
+        <span className="flex items-center gap-1.5">Days saved (estimate)
+          <Stepper value={saved} onChange={setSaved} min={0} max={60} disabled={ro} label={`${r.label} estimated days saved`} /></span>
+      </div>
     </li>
   );
 }

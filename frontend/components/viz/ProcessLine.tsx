@@ -32,10 +32,15 @@ const MAX_DOTS = 12;
 /**
  * The application journey drawn as a line of stations. Each station shows how many cases sit there,
  * how many are overdue, and one dot per case shaded by days in stage (red = overdue). Click to filter.
+ * With `delay` (projected delay per case), the one or two stations carrying the most delay are marked.
  */
-export function ProcessLine({ rows, value, onChange }: { rows: PendencyRow[]; value: StationId | null; onChange: (s: StationId | null) => void }) {
+export function ProcessLine({ rows, value, onChange, delay }: {
+  rows: PendencyRow[]; value: StationId | null; onChange: (s: StationId | null) => void; delay?: Record<string, number>;
+}) {
   const at = new Map<StationId, PendencyRow[]>(STATIONS.map((s) => [s.id, []]));
   rows.forEach((r) => at.get(stationOf(r))!.push(r));
+  const stationDelay = new Map<StationId, number>(STATIONS.map((s) => [s.id, (at.get(s.id) ?? []).reduce((t, r) => t + (delay?.[r.id] ?? 0), 0)]));
+  const hot = [...stationDelay.entries()].filter(([, d]) => d > 0).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([id]) => id);
   return (
     <div className="overflow-x-auto">
       <ol className="relative grid min-w-[760px] grid-cols-7" aria-label="Cases at each stage of the process">
@@ -45,10 +50,11 @@ export function ProcessLine({ rows, value, onChange }: { rows: PendencyRow[]; va
           const overdue = list.filter((r) => r.sla_status === "overdue").length;
           const on = value === s.id;
           const avg = list.length ? Math.round(list.reduce((t, r) => t + r.days_in_stage, 0) / list.length) : 0;
+          const building = hot.includes(s.id) ? stationDelay.get(s.id)! : 0;
           return (
             <li key={s.id} className="relative">
               <button onClick={() => onChange(on ? null : s.id)} aria-pressed={on}
-                aria-label={`${s.label}: ${list.length} cases, ${overdue} overdue. ${on ? "Clear filter" : "Show these cases"}`}
+                aria-label={`${s.label}: ${list.length} cases, ${overdue} overdue${building ? `, ${building} days of projected delay` : ""}. ${on ? "Clear filter" : "Show these cases"}`}
                 className={`group flex w-full flex-col items-center rounded-xl px-1.5 pb-3 pt-0 text-center transition-colors ${on ? "bg-brand-tint" : "hover:bg-surface-2"}`}>
                 <span className={`relative z-[1] mt-[7px] flex h-[18px] w-[18px] items-center justify-center rounded-full ring-4 ring-surface transition-transform group-hover:scale-110 ${list.length ? (overdue ? "bg-danger" : "bg-brand") : "bg-line-strong"}`}>
                   {on && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
@@ -64,6 +70,11 @@ export function ProcessLine({ rows, value, onChange }: { rows: PendencyRow[]; va
                   ))}
                   {list.length > MAX_DOTS && <span className="mono text-[10px] leading-[7px] text-ink-soft">+{list.length - MAX_DOTS}</span>}
                 </span>
+                {building > 0 && (
+                  <span className="mt-2 rounded-full bg-danger-tint px-2 py-px text-[11px] font-medium text-danger-ink">
+                    delay building <span className="mono">+{building}d</span>
+                  </span>
+                )}
               </button>
             </li>
           );

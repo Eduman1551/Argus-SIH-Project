@@ -6,7 +6,8 @@ import {
   PencilLine, RefreshCw, Send, Sparkles, Undo2, UserRoundCog, Users,
 } from "lucide-react";
 import { FileList, FilePicker, type FileRow } from "@/components/Files";
-import { UndertakingState } from "@/components/status";
+import { RecommendedAction, WhyAtRisk } from "@/components/intel/CaseIntel";
+import { RiskPill, UndertakingState } from "@/components/status";
 import Timeline, { type AuditEntry } from "@/components/Timeline";
 import {
   Button, Callout, Card, Collapsible, DocLayout, DraftLabel, DueCell, ErrorNote, Field, KeyVal, Modal, NextStep, Owner, PageHeader, PageSkeleton,
@@ -18,7 +19,7 @@ import { act, api, useApi } from "@/lib/api";
 import { addDays, dueText, fmtDate, fmtDateTime } from "@/lib/format";
 import { DECISION_TEXT, ENTITY_TEXT, RECOMMENDATION_TEXT, REPORT_OUTCOME_TEXT, STAGE_NAME, WAITING_TEXT } from "@/lib/labels";
 import { useApp, type SessionUser } from "@/lib/store";
-import type { Member, PendencyRow, Undertaking } from "@/lib/types";
+import type { CaseRisk, Member, PendencyRow, Undertaking } from "@/lib/types";
 
 /* ---------------------------------------------------------------- payload */
 interface RouteStep { seq: number; code: string; name: string; state: string; attempts: number; assignee: string | null;
@@ -61,6 +62,8 @@ type ModalKind = null | "complete" | "deficiency" | "reassign" | "revert" | "dec
 export default function CaseView({ appId, mode = "case" }: { appId: number; mode?: "case" | "committee" | "visit" }) {
   const user = useApp((s) => s.user)!;
   const { data, error, loading, reload } = useApi<CaseDetail>(`/api/applications/${appId}`);
+  // delay risk, explanation and recommendation: officials only (advice for the people who act on it)
+  const riskApi = useApi<CaseRisk>(user.role === "official" ? `/api/applications/${appId}/risk` : null);
   const [modal, setModal] = useState<ModalKind>(null);
   if (loading) return <PageSkeleton />;
   if (error || !data) return <ErrorNote error={error ?? { message: "Not found" }} onRetry={reload} />;
@@ -75,8 +78,13 @@ export default function CaseView({ appId, mode = "case" }: { appId: number; mode
       ? [{ label: "Institution", href: "/" }, { label: "Applications", href: "/applications" }, { label: a.ref_no }]
       : [{ label: "Cases" }, { label: "Applications", href: "/applications" }, { label: a.ref_no }];
 
+  const risk = riskApi.data;
+  const showRisk = !!risk?.assessment && a.status === "in_progress";
+  const showRec = !!risk && (!!risk.recommendation || risk.interventions.some((i) => i.status !== "withdrawn"));
   const toc = [
     { id: "status", label: a.status === "decided" ? "Decision" : "Where it stands" },
+    ...(showRisk ? [{ id: "risk", label: "Why at risk" }] : []),
+    ...(showRec ? [{ id: "recommendation", label: "Recommended action" }] : []),
     ...(escalations.length ? [{ id: "escalation", label: "Escalation" }] : []),
     ...(mode === "committee" && data.review ? [{ id: "committee", label: "SAC/SHC review" }] : []),
     ...(mode === "visit" && data.visit ? [{ id: "visit", label: "Expert visit" }] : []),
@@ -90,7 +98,9 @@ export default function CaseView({ appId, mode = "case" }: { appId: number; mode
 
   return (
     <div>
-      <PageHeader crumbs={crumbs} title={<span className="mono tracking-[-0.03em]">{a.ref_no}</span>}
+      <PageHeader crumbs={crumbs}
+        title={<span className="inline-flex flex-wrap items-center gap-3"><span className="mono tracking-[-0.03em]">{a.ref_no}</span>
+          {showRisk && risk?.assessment && <RiskPill band={risk.assessment.band} score={risk.assessment.score} />}</span>}
         description={<>{a.institution} · {a.programme}</>}
         action={primaryAction(data, has, setModal)} />
 
@@ -103,6 +113,8 @@ export default function CaseView({ appId, mode = "case" }: { appId: number; mode
             action={a.status === "in_progress" && data.sla ? <SlaStamp status={data.sla.sla_status} days={data.sla.days_to_due} level={data.sla.escalation_level} waitingOn={data.sla.waiting_on} /> : undefined}>
             {a.status === "decided" ? <DecisionBlock data={data} /> : data.current && <CurrentStage data={data} has={has} open={setModal} />}
           </Card>
+          {showRisk && risk && <WhyAtRisk risk={risk} />}
+          {showRec && risk && <RecommendedAction risk={risk} />}
 
           {escalations.length > 0 && <EscalationCard data={data} />}
           {mode === "committee" && data.review && <CommitteeCard review={data.review} has={has} open={setModal} reload={reload} />}

@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
-import { AlertTriangle, ArrowRight, ListTodo, MapPin } from "lucide-react";
+import { ArrowRight, ListTodo, MapPin } from "lucide-react";
 import { CasePreview } from "@/components/case/CasePreview";
+import { DelaysBuilding, NeedsAttention } from "@/components/intel/DashboardIntel";
 import { HeatCalendar, type CalEvent } from "@/components/viz/HeatCalendar";
 import { ProcessLine, STATIONS, stationOf, type StationId } from "@/components/viz/ProcessLine";
 import { RegionTiles, type RegionStat } from "@/components/viz/RegionTiles";
@@ -15,7 +16,7 @@ import {
 import { useApi } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
 import { useApp } from "@/lib/store";
-import type { OfficialDashboard as Dash, PendencyRow, TrackedDoc, Undertaking, Visit } from "@/lib/types";
+import type { OfficialDashboard as Dash, IntelOverview, PendencyRow, TrackedDoc, Undertaking, Visit } from "@/lib/types";
 
 const LIST_MAX = 6;
 
@@ -30,6 +31,7 @@ export default function OfficialDashboard() {
 
   const { data, error, loading, reload } = useApi<Dash>(`/api/dashboard${region ? `?region_id=${region}` : "?all_regions=true"}`);
   const pend = useApi<{ rows: PendencyRow[] }>("/api/reports/pendency");
+  const intel = useApi<IntelOverview>(`/api/intelligence/overview${region ? `?region_id=${region}` : "?all_regions=true"}`);
   const regions = useApi<{ id: number; code: string; name: string }[]>("/api/regions");
   const unds = useApi<{ rows: Undertaking[] }>("/api/undertakings?all_regions=true");
   const docs = useApi<{ rows: TrackedDoc[] }>("/api/tracked-documents?all_regions=true");
@@ -87,12 +89,16 @@ export default function OfficialDashboard() {
         <Stat label="Escalated" value={t.escalated} tone={t.escalated ? "red" : "ink"} hint="Sent up the chain" href="/escalations" />
       </Metrics>
 
-      <Card title="Where cases are" subtitle="Click a step to list its cases" className="mb-6"
-        action={data.bottleneck && data.bottleneck.cases > 0 ? (
-          <span className="hidden items-center gap-1.5 rounded-full bg-warn-tint px-2.5 py-1 text-[12px] text-warn-ink md:inline-flex">
-            <AlertTriangle size={13} /><span>Slowest step: <b className="font-medium">{data.bottleneck.name}</b></span>
-          </span>) : undefined}>
-        {pend.data ? <ProcessLine rows={scoped} value={station} onChange={setStation} /> : <div className="skeleton h-[150px]" />}
+      {intel.data ? (
+        <div className="mb-6 grid items-start gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+          <NeedsAttention data={intel.data} />
+          <DelaysBuilding data={intel.data} />
+        </div>
+      ) : <div className="skeleton mb-6 h-[180px]" />}
+
+      <Card title="Where cases are" subtitle="Click a step to list its cases" className="mb-6">
+        {pend.data ? <ProcessLine rows={scoped} value={station} onChange={setStation}
+          delay={intel.data ? Object.fromEntries(Object.entries(intel.data.cases).map(([k, v]) => [k, v.projected_delay])) : undefined} /> : <div className="skeleton h-[150px]" />}
         <div className="mt-4">
           <FilterChips chips={chips} onClear={() => { setRegion(null); setStation(null); }} />
           {shown.length ? (

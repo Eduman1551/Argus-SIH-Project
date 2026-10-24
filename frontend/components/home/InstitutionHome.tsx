@@ -7,7 +7,7 @@ import { CasePreview } from "@/components/case/CasePreview";
 import { HeatCalendar, type CalEvent } from "@/components/viz/HeatCalendar";
 import { SlaBar, rowSla, type StageWindow } from "@/components/viz/SlaBar";
 import {
-  Card, DueCell, Empty, ErrorNote, HelpBox, LinkButton, Metrics, NextStep, PageHeader, PageSkeleton, SlaStamp, Stamp, Stat,
+  Callout, Card, DueCell, Empty, ErrorNote, HelpBox, LinkButton, Metrics, NextStep, PageHeader, PageSkeleton, SlaStamp, Stamp, Stat,
   Table, useRowNav,
 } from "@/components/ui";
 import { useApi } from "@/lib/api";
@@ -29,6 +29,7 @@ interface Home {
   visits: { id: number; ref_no: string; application_id: number; status: string; visit_date: string | null }[];
   undertakings: Undertaking[]; evidence_waiting: Undertaking[]; documents_attention: TrackedDoc[];
   counts: { applications: number; in_progress: number; actions: number; overdue_actions: number };
+  blockers: { application_id: number; ref_no: string; due_date: string | null; days_to_due: number | null }[];
 }
 
 const ICON: Record<string, React.ReactNode> = {
@@ -65,6 +66,16 @@ export default function InstitutionHome() {
         Start at the top of <b>What needs you</b>. Argus reminds you before each deadline.
       </HelpBox>
 
+      {data.blockers.length > 0 && (
+        <Callout kind="warning" title="Your reply is needed to avoid delay">
+          {data.blockers.map((b, i) => (
+            <span key={b.application_id}>{i > 0 && "; "}
+              <Link href={`/applications/${b.application_id}`} className="mono font-medium">{b.ref_no}</Link>
+              {b.due_date && <> — reply by <span className="mono">{fmtDate(b.due_date)}</span> ({dueText(b.days_to_due)})</>}
+            </span>
+          ))}.
+        </Callout>
+      )}
       <Metrics>
         <Stat label="In progress" value={data.counts.in_progress} hint={`${data.counts.applications} applications in total`} href="/applications" />
         <Stat label="Waiting on you" value={data.counts.actions} tone={data.counts.actions ? "warn" : "good"} hint="Things to do" />

@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  BellRing, CalendarCheck2, Check, CircleDot, ClipboardCheck, Copy, FileUp, Flag, Gavel, GitBranch, MessageSquareWarning, Send, Users,
+  BellRing, CalendarCheck2, Check, CircleDot, ClipboardCheck, Copy, FileUp, Flag, Gavel, GitBranch, Lightbulb, MessageSquareWarning, Send,
+  Users,
 } from "lucide-react";
 import { fmtDate, fmtDateTime } from "@/lib/format";
 import { ACTION_TEXT, DECISION_TEXT, ENTITY_TEXT, STAGE_NAME } from "@/lib/labels";
@@ -36,6 +37,12 @@ function detailText(e: AuditEntry): string | null {
     }
     case "escalation.raised": return `Level ${s("level")}, to ${s("escalated_to")}`;
     case "document.uploaded": return s("filename");
+    case "intervention.recommended": return s("reason");
+    case "intervention.approved": {
+      const r = d.result as { done?: string } | undefined;
+      return r?.done ?? null;
+    }
+    case "intervention.dismissed": case "intervention.withdrawn": return s("reason");
     default: return null;
   }
 }
@@ -44,6 +51,7 @@ function iconFor(action: string) {
   const g = action.split(".")[0];
   if (action === "decision.recorded") return <Gavel size={13} />;
   if (action.startsWith("escalation")) return <Flag size={13} />;
+  if (action.startsWith("intervention")) return <Lightbulb size={13} />;
   if (action === "alert.fired") return <BellRing size={13} />;
   if (action === "deficiency.raised") return <MessageSquareWarning size={13} />;
   if (action === "deficiency.responded") return <Send size={13} />;
@@ -60,7 +68,8 @@ function tone(action: string) {
   if (action.startsWith("escalation.raised")) return "bg-esc-tint text-esc";
   if (action === "alert.fired") return "bg-warn-tint text-warn-ink";
   if (action === "deficiency.raised") return "bg-danger-tint text-danger-ink";
-  if (action === "decision.recorded" || action.endsWith("verified") || action === "stage.completed") return "bg-brand-tint text-brand";
+  if (action === "intervention.recommended") return "bg-warn-tint text-warn-ink";
+  if (action === "decision.recorded" || action.endsWith("verified") || action === "stage.completed" || action === "intervention.approved") return "bg-brand-tint text-brand";
   return "bg-surface-2 text-ink-soft ring-1 ring-inset ring-line";
 }
 

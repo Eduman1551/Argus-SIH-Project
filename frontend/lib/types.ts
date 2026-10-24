@@ -52,4 +52,52 @@ export interface Visit {
   region_id: number; status: string; category: string; step: string; step_due_at: string | null;
   days_to_due: number | null; visit_date: string | null; members: Member[]; officer: string | null;
   escalation_level: number | null; my_availability?: string; i_am_convenor?: boolean; my_action?: string | null;
+  likely_delayed?: boolean;
+}
+
+/* ---------------------------------------------------------------- workflow intelligence */
+export type RiskBand = "low" | "medium" | "high";
+
+export interface RiskReason { code: string; label: string; points: number; text: string }
+
+export interface RiskAssessment {
+  score: number; band: RiskBand; projected_completion: string; case_due: string; projected_delay: number;
+  remaining_days: number; allowed_days: number; summary: string; reasons: RiskReason[];
+  factors: { code: string; label: string; value: number; weight: number; points: number; text: string }[];
+  bands: { medium: number; high: number }; expected: Record<string, number>;
+}
+
+export interface InterventionOutcome {
+  checkpoint: "day7" | "completion"; measured_on: string; score_after: number | null; delay_after: number;
+  risk_dropped: boolean | null; days_saved: number; on_time: boolean | null;
+}
+
+export interface InterventionRow {
+  id: number; status: "open" | "approved" | "dismissed" | "withdrawn"; action: string; reason: string; effect: string;
+  created_at: string; score_before: number; band_before: RiskBand; delay_before: number; decided_at: string | null;
+  decision_note: string | null; result: { done?: string } | null; rule_version: number; rule_code: string;
+  rule_label: string; action_text: string; authorized_by: string; est_days_saved: number; decided_by_name: string | null;
+  outcomes: InterventionOutcome[] | null; can_act: boolean; authorized_text: string;
+}
+
+export interface CaseRisk {
+  assessment: RiskAssessment | null;
+  split: { days: Record<string, number>; percent: Record<string, number>; total_days: number; as_of: string };
+  history: { assessed_on: string; score: number; band: RiskBand; projected_delay: number }[];
+  recommendation: InterventionRow | null;
+  interventions: InterventionRow[];
+}
+
+export interface Bottleneck {
+  kind: string; label: string; cases: number; high: number; late: number; delay_days: number; share_pct: number;
+  cause: string; text: string; app_ids: number[];
+}
+
+export interface IntelOverview {
+  counts: Record<RiskBand, number>;
+  needs_attention: { id: number; application_id: number; ref_no: string; institution: string; score: number; band: RiskBand;
+    rule_label: string; reason: string; action_text: string; stage_name: string; projected_delay: number }[];
+  open_recommendations: number;
+  bottlenecks: Bottleneck[];
+  cases: Record<string, { score: number; band: RiskBand; projected_delay: number }>;
 }

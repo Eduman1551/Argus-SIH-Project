@@ -18,7 +18,7 @@ export { VisitStamp } from "@/components/status";
 
 interface Review {
   id: number; application_id: number; ref_no: string; institution: string; type_name: string; status: string;
-  recommendation: string | null; due_at: string; days_to_due: number;
+  recommendation: string | null; due_at: string; days_to_due: number; likely_delayed?: boolean;
 }
 interface Cases { visits: Visit[]; reviews: Review[]; counts: { visits_open: number; actions: number; reviews_pending: number } }
 
@@ -87,7 +87,7 @@ export default function CommitteeCases() {
                     <td>{v.step}{v.my_action && <div className="text-[12px] font-medium text-brand">{v.my_action}</div>}</td>
                     <td className="mono">{v.visit_date ? fmtDate(v.visit_date) : "–"}</td>
                     <td><DueCell date={v.step_due_at} days={v.days_to_due} fmt={fmtDate} /></td>
-                    <td><VisitStamp v={v} /></td>
+                    <td><span className="inline-flex flex-wrap items-center gap-1"><VisitStamp v={v} />{v.likely_delayed && <Stamp tone="soon">Likely to be delayed</Stamp>}</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -107,7 +107,7 @@ export default function CommitteeCases() {
                     <td><span className="mono font-medium text-brand">{r.ref_no}</span><div className="text-[12px] text-ink-soft">{r.institution}</div></td>
                     <td>{r.type_name}</td>
                     <td>{r.status === "pending" ? <DueCell date={r.due_at} days={r.days_to_due} fmt={fmtDate} /> : <span className="text-ink-soft">–</span>}</td>
-                    <td>{r.status === "pending" ? (r.days_to_due < 0 ? <Stamp tone="overdue" solid /> : <Stamp tone="soon">Awaiting you</Stamp>) : <Stamp tone="closed">{RECOMMENDATION_TEXT[r.recommendation ?? ""] ?? "Recorded"}</Stamp>}</td>
+                    <td><span className="inline-flex flex-wrap items-center gap-1">{r.status === "pending" ? (r.days_to_due < 0 ? <Stamp tone="overdue" solid /> : <Stamp tone="soon">Awaiting you</Stamp>) : <Stamp tone="closed">{RECOMMENDATION_TEXT[r.recommendation ?? ""] ?? "Recorded"}</Stamp>}{r.likely_delayed && <Stamp tone="soon">Likely to be delayed</Stamp>}</span></td>
                   </tr>
                 ))}
               </tbody>
