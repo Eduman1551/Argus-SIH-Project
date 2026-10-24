@@ -115,11 +115,11 @@ Numbers below are what the seeded data gives after Reset; they come from the eng
    carrying the most projected delay are marked "delay building".
 2. Open **ARG/2026/NR/0047** (Brightwater, Scrutiny): the pill says **Medium risk 64**.
 3. Date chip → **+7 days**. Open NR/0047 again: now **High risk 67**. **Why at risk** gives the reasons in points
-   (time limit used, 25 days at Scrutiny, remaining work), where the time went, and "How this was calculated".
+   (time limit used, 29 days at Scrutiny, remaining work), where the time went, and "How this was calculated".
 4. **Recommended action**: "Stage taking too long: bring the case to the next level", with the reason and the estimated
-   days saved. Press **Approve**: the case is brought to the next level (L2). The approval is in the timeline and the
+   days saved. Press **Approve**: the escalation chain already has it at L2, so it is brought to L3 (Ritu Emberly). The approval is in the timeline and the
    audit trail with your name. (Try it as Kavya or Prof. Duskwood: they cannot see or approve it.)
 5. Still as Arjun, **Complete scrutiny**. The case moves to the expert visit and the risk drops to **Low**.
-6. Date chip → **+7 days**. The case page now shows the outcome under the action: risk 67 → about 37, about 5 days saved.
+6. Date chip → **+7 days**. The case page now shows the outcome under the action: risk 67 → 37, projected delay 9 days → 0.
    **Performance** → *Intelligence results* shows the success rate, days saved, prediction accuracy and false alerts.
 
