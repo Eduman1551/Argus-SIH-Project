@@ -85,15 +85,20 @@ def conn(prepared_db):
 
 @pytest.fixture
 def fresh_db(prepared_db):
-    """Restore the seeded snapshot (committed) for tests that go through the API."""
+    """Restore the seeded snapshot (committed) for tests that go through the API, before and after the test,
+    so committed changes such as a clock advance never leak into later tests."""
     from app.data.snapshot import restore
     from db import Conn, connect
 
-    raw = connect()
-    restore(Conn(raw))
-    raw.commit()
-    raw.close()
-    return prepared_db
+    def _restore():
+        raw = connect()
+        restore(Conn(raw))
+        raw.commit()
+        raw.close()
+
+    _restore()
+    yield prepared_db
+    _restore()
 
 
 def user(c, code: str) -> dict:
