@@ -22,11 +22,12 @@ TABLES = [
     "application_types", "reminder_rules", "escalation_levels", "escalation_rules", "notification_templates",
     "settings", "files", "applications", "application_stages", "deficiencies", "evc_visits", "evc_members",
     "visit_reports", "committee_reviews", "committee_members", "undertakings", "evidence_submissions",
-    "tracked_documents", "alerts", "escalations", "notifications", "outbox", "audit_log",
+    "tracked_documents", "alerts", "escalations", "notifications", "outbox", "risk_factors", "intervention_rules",
+    "risk_assessments", "interventions", "intervention_outcomes", "audit_log",
 ]
 NO_SERIAL = {"platform_clock", "sla_rules", "stages", "routes", "route_stages", "application_types",
              "escalation_levels", "notification_templates", "settings", "evc_members", "committee_members",
-             "audit_log"}
+             "risk_factors", "intervention_outcomes", "audit_log"}
 SEPARATOR = "\\.argus-table "
 
 

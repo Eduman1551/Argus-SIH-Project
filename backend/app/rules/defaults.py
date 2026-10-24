@@ -108,6 +108,10 @@ TEMPLATES = [
     ("event.report_submitted", "Visit report submitted", "Visit report submitted for {ref}", "The EVC visit report for {ref} is submitted and awaits review.", "Argus: visit report for {ref} submitted."),
     ("event.committee_assigned", "SAC/SHC review assigned", "SAC/SHC review: {ref}", "{ref} ({institution}) is placed before you for SAC/SHC review. Due {due_date}.", "Argus: SAC/SHC review {ref}."),
     ("event.recommendation", "Recommendation recorded", "Committee recommendation on {ref}", "The committee recorded its recommendation on {ref}: {outcome}.", "Argus: recommendation on {ref}."),
+    ("intervention.reminder", "Priority reminder (recommended action)", "Priority: your reply on {ref} is needed", "Your reply on {ref} is needed to avoid delay. Please answer the open deficiency by {due_date}.", "Argus: PRIORITY reply needed on {ref} by {due_date}."),
+    ("intervention.escalate", "Escalation (recommended action)", "Attention needed: {ref} at {stage}", "{ref} ({institution}) has been at {stage} longer than expected and is likely to be delayed. {actor} brought it to your attention.", "Argus: {ref} needs attention ({stage})."),
+    ("intervention.document", "Document request (recommended action)", "Please renew {item} before {due_date}", "{item} of {institution} expires on {due_date}, before the expected decision on {ref}. Please upload the renewed document.", "Argus: renew {item} before {due_date}."),
+    ("intervention.availability", "Availability reminder (recommended action)", "Please confirm your dates for the visit to {ref}", "The expert visit for {ref} ({institution}) cannot be scheduled until all members confirm their dates. Please confirm today.", "Argus: confirm EVC dates for {ref}."),
 ]
 
 SETTINGS = [
@@ -116,4 +120,46 @@ SETTINGS = [
     ("evc_due_window_days", 3, "EVC visit due window (days)", "Scheduled visits within this many days show as Due."),
     ("assumed_manual_followups_per_alert", 1, "Manual follow-ups replaced per alert (assumed)",
      "Assumption used for the Manual follow-up reduction KPI. Not a measured value."),
+    ("risk_band_medium", 40, "Delay risk: Medium from (score)", "A case with a delay risk score at or above this is Medium."),
+    ("risk_band_high", 65, "Delay risk: High from (score)", "A case with a delay risk score at or above this is High."),
+    ("reviewer_capacity", 6, "Officer capacity (open cases)",
+     "Open cases an officer can carry before workload adds to delay risk."),
+    ("committee_capacity", 6, "Committee member capacity (open visits or reviews)",
+     "Open visits or reviews a member can carry before workload adds to delay risk."),
+    ("recommendation_snooze_days", 14, "Do not repeat a dismissed recommendation for (days)",
+     "After a recommendation is dismissed, the same one is not suggested again for this many days."),
+]
+
+# Delay risk factors: code, label, weight (points), description. Illustrative starting weights.
+RISK_FACTORS = [
+    ("sla", "Time limit used", 30, "Working days used against the total time allowed for the case type."),
+    ("stage_ageing", "Stage ageing", 20, "Days in the current stage against 1.5 times the expected duration."),
+    ("institution", "Waiting on the institution", 15,
+     "Share of time spent waiting on the institution, plus any unanswered deficiency."),
+    ("reviewer_load", "Reviewer load", 15, "Open cases of the officer or committee members against their capacity."),
+    ("pipeline", "Remaining work", 10, "Expected days of remaining work against the days left to the due date."),
+    ("returns", "Repeat returns", 5, "Times the case was returned, out of 3."),
+    ("dependency", "Dependencies", 5,
+     "Expert visit not yet scheduled, or a document expiring before the expected decision."),
+]
+
+# Recommended interventions: code, label, trigger, action, action text, authorized by, threshold,
+# threshold label, estimated days saved (an estimate, not a measurement).
+INTERVENTION_RULES = [
+    ("silent_institution", "Institution has not replied",
+     "High risk and a deficiency reply pending for more than N days", "priority_reminder",
+     "Send a priority reminder to the institution", "regional", 7, "Days the reply has been pending", 5),
+    ("reviewer_overload", "Officer over capacity",
+     "Officer above capacity and another eligible officer in the Region below N percent load", "reassign",
+     "Reassign the case to the least-loaded eligible officer", "regional", 70, "Other officer load below (percent)", 6),
+    ("evc_unscheduled", "Expert visit not scheduled",
+     "Case at the EVC stage for N days or more and the visit is not scheduled", "propose_visit_slot",
+     "Move the visit forward: assign members, remind them, or fix the earliest common date", "regional", 2,
+     "Days at the EVC stage", 7),
+    ("stage_ageing", "Stage taking too long",
+     "Days in the current stage above N percent of the expected duration", "escalate",
+     "Bring the case to the next level (L1, L2, L3)", "regional_or_bureau", 150, "Percent of expected duration", 4),
+    ("document_expiring", "Document expires before the decision",
+     "A tracked document expires before the expected decision date", "request_document",
+     "Ask the institution for the renewed document", "regional", 0, "Days of margin before the decision", 3),
 ]

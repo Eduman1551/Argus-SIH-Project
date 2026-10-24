@@ -49,6 +49,11 @@ def seed_defaults(conn: Conn, effective_from: date) -> None:
     conn.many("INSERT INTO notification_templates (code, label, subject, body, sms) VALUES (%s,%s,%s,%s,%s)", D.TEMPLATES)
     conn.many("INSERT INTO settings (key, value, label, description) VALUES (%s,%s::jsonb,%s,%s)",
               [(k, json.dumps(v), label, desc) for k, v, label, desc in D.SETTINGS])
+    conn.many("INSERT INTO risk_factors (code, label, weight, sort, description) VALUES (%s,%s,%s,%s,%s)",
+              [(code, label, w, i + 1, desc) for i, (code, label, w, desc) in enumerate(D.RISK_FACTORS)])
+    conn.many("""INSERT INTO intervention_rules (code, label, trigger_text, action, action_text, authorized_by, threshold,
+                                                 threshold_label, est_days_saved) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+              D.INTERVENTION_RULES)
 
 
 # ------------------------------------------------------------------ reads
@@ -111,6 +116,10 @@ def get_all(conn: Conn) -> dict:
                                         FROM escalation_rules ORDER BY entity_type, level"""),
         "templates": conn.all("SELECT code, label, subject, body, sms FROM notification_templates ORDER BY code"),
         "settings": conn.all("SELECT key, value, label, description FROM settings ORDER BY key"),
+        "risk_factors": conn.all("SELECT code, label, weight, description FROM risk_factors ORDER BY sort"),
+        "intervention_rules": conn.all("""SELECT id, code, label, trigger_text, action, action_text, authorized_by,
+                                                 threshold, threshold_label, est_days_saved, active, version
+                                          FROM intervention_rules ORDER BY id"""),
         "entity_types": [{"code": k, "label": v} for k, v in D.ENTITY_LABELS.items()],
         "escalation_targets": [{"code": k, "label": v} for k, v in ESCALATION_TARGETS.items()],
     }
@@ -238,3 +247,36 @@ def update_setting(conn: Conn, now, actor, key: str, value: Any) -> None:
         raise RuleError("Value must be a whole number between 0 and 365.")
     conn.run("UPDATE settings SET value = %s::jsonb WHERE key = %s", (json.dumps(value), key))
     _audit(conn, now, actor, "setting", key, before["value"], value)
+
+
+def update_risk_weight(conn: Conn, now, actor, code: str, weight: int) -> None:
+    if not isinstance(weight, int) or isinstance(weight, bool) or not 0 <= weight <= 100:
+        raise RuleError("Weight must be a whole number between 0 and 100.")
+    before = conn.val("SELECT weight FROM risk_factors WHERE code = %s FOR UPDATE", (code,))
+    if before is None:
+        raise RuleError("Unknown risk factor.")
+    others = conn.val("SELECT COALESCE(sum(weight), 0) FROM risk_factors WHERE code <> %s", (code,))
+    if others + weight == 0:
+        raise RuleError("At least one risk factor needs a weight above zero.")
+    conn.run("UPDATE risk_factors SET weight = %s WHERE code = %s", (weight, code))
+    conn.cache.pop("intelligence_config", None)
+    _audit(conn, now, actor, "risk_weight", code, before, weight)
+
+
+def update_intervention_rule(conn: Conn, now, actor, code: str, active: bool, threshold: int,
+                             est_days_saved: int) -> None:
+    """Edit a recommendation rule. Each change bumps its version; recommendations keep the version they came from."""
+    before = conn.one("""SELECT active, threshold, est_days_saved, version FROM intervention_rules
+                         WHERE code = %s FOR UPDATE""", (code,))
+    if before is None:
+        raise RuleError("Unknown recommendation rule.")
+    for value, lo, hi, name in ((threshold, 0, 365, "Threshold"), (est_days_saved, 0, 60, "Estimated days saved")):
+        if not isinstance(value, int) or isinstance(value, bool) or not lo <= value <= hi:
+            raise RuleError(f"{name} must be a whole number between {lo} and {hi}.")
+    after = {"active": bool(active), "threshold": threshold, "est_days_saved": est_days_saved,
+             "version": before["version"] + 1}
+    conn.run("""UPDATE intervention_rules SET active = %(active)s, threshold = %(threshold)s,
+                       est_days_saved = %(est_days_saved)s, version = %(version)s WHERE code = %(code)s""",
+             {**after, "code": code})
+    conn.cache.pop("intelligence_config", None)
+    _audit(conn, now, actor, "intervention_rule", code, dict(before), after)

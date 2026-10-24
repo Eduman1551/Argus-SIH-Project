@@ -400,6 +400,90 @@ CREATE TABLE outbox (
 );
 CREATE INDEX ON outbox (status);
 
+-- ---------------------------------------------------------------- workflow intelligence (rule-based, explainable)
+-- Delay risk = 100 * sum(weight * factor) / sum(weight), every factor in [0, 1]. Weights are configuration.
+CREATE TABLE risk_factors (
+    code         text PRIMARY KEY,
+    label        text NOT NULL,
+    weight       int NOT NULL CHECK (weight BETWEEN 0 AND 100),
+    sort         int NOT NULL,
+    description  text NOT NULL DEFAULT ''
+);
+
+-- Recommended interventions. The trigger logic is named by `code`; its numbers are editable here.
+CREATE TABLE intervention_rules (
+    id              serial PRIMARY KEY,
+    code            text NOT NULL UNIQUE,
+    label           text NOT NULL,
+    trigger_text    text NOT NULL,
+    action          text NOT NULL CHECK (action IN ('priority_reminder', 'reassign', 'propose_visit_slot', 'escalate',
+                                                    'request_document')),
+    action_text     text NOT NULL,
+    authorized_by   text NOT NULL CHECK (authorized_by IN ('regional', 'regional_or_bureau', 'bureau')),
+    threshold       int NOT NULL CHECK (threshold BETWEEN 0 AND 365),
+    threshold_label text NOT NULL,
+    est_days_saved  int NOT NULL CHECK (est_days_saved BETWEEN 0 AND 60),
+    active          boolean NOT NULL DEFAULT true,
+    version         int NOT NULL DEFAULT 1
+);
+
+-- One stored assessment per open application per simulated day (written by the alert tick).
+CREATE TABLE risk_assessments (
+    id                    serial PRIMARY KEY,
+    application_id        int NOT NULL REFERENCES applications(id),
+    assessed_on           date NOT NULL,
+    assessed_at           timestamptz NOT NULL,
+    score                 int NOT NULL CHECK (score BETWEEN 0 AND 100),
+    band                  text NOT NULL CHECK (band IN ('low', 'medium', 'high')),
+    factors               jsonb NOT NULL,          -- factor code -> value in [0, 1]
+    projected_completion  date NOT NULL,
+    case_due              date NOT NULL,
+    projected_delay       int NOT NULL,
+    stage_code            text NOT NULL,
+    region_id             int NOT NULL,
+    assigned_to           int,
+    UNIQUE (application_id, assessed_on)
+);
+CREATE INDEX ON risk_assessments (assessed_on);
+
+-- A recommendation is only advice: a permitted official approves (runs the action) or dismisses it.
+CREATE TABLE interventions (
+    id                  serial PRIMARY KEY,
+    application_id      int NOT NULL REFERENCES applications(id),
+    rule_id             int NOT NULL REFERENCES intervention_rules(id),
+    rule_version        int NOT NULL,
+    action              text NOT NULL,
+    status              text NOT NULL CHECK (status IN ('open', 'approved', 'dismissed', 'withdrawn')),
+    reason              text NOT NULL,
+    effect              text NOT NULL,
+    params              jsonb NOT NULL DEFAULT '{}',
+    created_at          timestamptz NOT NULL,
+    score_before        int NOT NULL,
+    band_before         text NOT NULL,
+    delay_before        int NOT NULL,
+    projected_before    date NOT NULL,
+    case_due_before     date NOT NULL,
+    decided_by          int REFERENCES users(id),
+    decided_at          timestamptz,
+    decision_note       text,
+    result              jsonb
+);
+CREATE UNIQUE INDEX interventions_one_open ON interventions (application_id) WHERE status = 'open';
+CREATE INDEX ON interventions (status);
+
+-- Re-measured after an approved intervention: 7 simulated days later, and when the case is decided.
+CREATE TABLE intervention_outcomes (
+    intervention_id  int NOT NULL REFERENCES interventions(id),
+    checkpoint       text NOT NULL CHECK (checkpoint IN ('day7', 'completion')),
+    measured_on      date NOT NULL,
+    score_after      int,
+    delay_after      int NOT NULL,
+    risk_dropped     boolean,
+    days_saved       int NOT NULL,
+    on_time          boolean,
+    PRIMARY KEY (intervention_id, checkpoint)
+);
+
 -- ---------------------------------------------------------------- audit (append-only, hash-chained)
 CREATE TABLE audit_log (
     id              bigint PRIMARY KEY,

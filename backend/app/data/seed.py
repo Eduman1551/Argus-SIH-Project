@@ -16,10 +16,11 @@ import random
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
-from app import clock, compliance, documents, rules, scheduling, workflow
+from app import clock, compliance, documents, intelligence, rules, scheduling, workflow
 from app.alerts import run_alert_tick
 from app.audit import record
 from app.clock import IST, SEED_NOW, ist_date
+from app.common import DomainError
 from app.data import people as P
 from app.data.snapshot import load_dump
 from app.data.snapshot import save as save_snapshot
@@ -149,7 +150,7 @@ def _maybe(rng: random.Random, p_none: float, lo: int, hi: int) -> int | None:
 def generic_plan(rng: random.Random, inst: str, submit: int, ay: str, legacy: bool) -> AppPlan:
     types, weights = zip(*TYPE_WEIGHTS, strict=True)
     app_type = rng.choices(types, weights)[0]
-    slow = 0.0 if legacy else 0.12
+    slow = 0.12
     never = 0.0 if legacy else 0.03
     p = AppPlan(inst=inst, app_type=app_type, submit=submit, ay=ay)
     p.intake = rng.randint(1, 5) if rng.random() > slow else rng.randint(8, 12)
@@ -195,6 +196,9 @@ class Sim:
         self.u_behaviour: dict[int, dict] = {}
         self.d_behaviour: dict[int, dict] = {}
         self.day = START_DAY
+        # A separate generator for the officers who act on recommendations, so adding them leaves every
+        # other random draw (cases, people, plans) exactly as before.
+        self.irng = random.Random(SEED * 7 + 1)
 
     @property
     def now(self) -> datetime:
@@ -340,6 +344,66 @@ class Sim:
             if e.review is not None and since >= e.review:
                 scheduling.review_report(c, now, officer, v["id"], "Visit report reviewed and placed on record.")
 
+    # -------------------------------------------------------------- recommendations (synthetic history)
+    def act_on_interventions(self) -> None:
+        """Scripted officers approve or dismiss open recommendations on the generic (non-demo) cases, and the
+        people involved respond the way the action implies. This gives the history real interventions with
+        measured outcomes. Demo cases are left alone so docs/DEMO.md stays the same."""
+        c, now, d = self.conn, self.now, self.day
+        by_app = {p.app_id: p for p in self.plans if p.app_id is not None}
+        rows = c.all("""SELECT i.id, i.application_id, i.action, i.params, i.created_at, r.authorized_by, a.region_id
+                        FROM interventions i JOIN intervention_rules r ON r.id = i.rule_id
+                        JOIN applications a ON a.id = i.application_id
+                        WHERE i.status = 'open' ORDER BY i.id""")
+        for iv in rows:
+            plan = by_app.get(iv["application_id"])
+            if plan is None or plan.tag or d - day_of(iv["created_at"]) < 1:
+                continue
+            roll = self.irng.random()
+            actor = self.region_officer(iv["region_id"]) if roll < 0.35 else self.region_director(iv["region_id"])
+            if roll < 0.62:
+                try:
+                    intelligence.approve(c, now, actor, iv["id"])
+                except DomainError:
+                    intelligence.dismiss(c, now, actor, iv["id"], "Cannot be carried out at this point in the case.")
+                    continue
+                self.respond_to(plan, iv)
+            elif roll < 0.75:
+                intelligence.dismiss(c, now, actor, iv["id"], self.irng.choice(P.DISMISS_REASONS))
+
+    def respond_to(self, p: AppPlan, iv: dict) -> None:
+        """How the synthetic participants react to an approved intervention (assumed behaviour)."""
+        c, d = self.conn, self.day
+        app = workflow.get_application(c, p.app_id)
+        st = c.one("SELECT * FROM application_stages WHERE id = %s", (app["current_stage_id"],))
+        since = d - day_of(st["started_at"])
+        quick = self.irng.randint(2, 4)
+        if iv["action"] == "priority_reminder":
+            dfc = c.one("SELECT raised_at FROM deficiencies WHERE stage_id = %s AND status = 'open'", (st["id"],))
+            if dfc:
+                p.reply = d - day_of(dfc["raised_at"]) + quick
+        elif iv["action"] in ("reassign", "escalate"):
+            if st["stage_code"] == "intake":
+                p.intake = min(p.intake if p.intake is not None else 999, since + quick)
+            elif st["stage_code"] == "scrutiny":
+                p.scrutiny = min(p.scrutiny if p.scrutiny is not None else 999, since + quick)
+                p.rereview = min(p.rereview if p.rereview is not None else 999, quick)
+            elif st["stage_code"] == "decision":
+                p.decision = min(p.decision if p.decision is not None else 999, since + quick)
+            elif st["stage_code"] == "sac":
+                p.sac = min(p.sac if p.sac is not None else 999, since + quick)
+        elif iv["action"] == "propose_visit_slot":
+            v = c.one("SELECT status, step_started_at FROM evc_visits WHERE stage_id = %s AND status <> 'cancelled'",
+                      (st["id"],))
+            if v and v["status"] == "availability_pending":
+                step = d - day_of(v["step_started_at"])
+                p.evc.avail = [step + self.irng.randint(1, 2) for _ in range(3)]
+        elif iv["action"] == "request_document":
+            doc_id = (iv["params"] or {}).get("doc_id")
+            if doc_id in self.d_behaviour:
+                self.d_behaviour[doc_id].update({"mode": "fixed", "day": d + quick, "years": self.irng.randint(1, 3),
+                                                 "verify": self.irng.randint(1, 4), "once": True})
+
     # -------------------------------------------------------------- undertakings
     def undertaking_behaviour(self, uid: int, kind: str) -> dict:
         u = self.conn.one("SELECT due_at, created_at FROM undertakings WHERE id = %s", (uid,))
@@ -415,6 +479,8 @@ class Sim:
                     while new_exp <= date_of(d):
                         new_exp += timedelta(days=365)
                     compliance.submit_renewal(c, now, actor, t["id"], f["id"], new_exp)
+                    if b.pop("once", False):  # a renewal sent after a document request goes back to normal habits
+                        b.update({"mode": "renew", "lead": 20})
             elif t["status"] == "renewal_submitted" and b.get("verify") is not None:
                 if d - day_of(t["renewal_submitted_at"]) >= b["verify"]:
                     reject = b.get("reject_first") and not b.get("rejected_once")
@@ -577,6 +643,7 @@ def generate(conn: Conn, progress=print) -> dict:
         sim.day = d
         clock.set_now(conn, sim.now)
         run_alert_tick(conn, sim.now)
+        sim.act_on_interventions()
         for p in sim.plans:
             sim.act_on_application(p)
         sim.act_on_undertakings()
@@ -603,7 +670,7 @@ def load(conn: Conn) -> dict:
 def counts(conn: Conn) -> dict:
     return {t: conn.val(f"SELECT count(*) FROM {t}") for t in (
         "institutions", "users", "applications", "evc_visits", "undertakings", "tracked_documents", "alerts",
-        "escalations", "notifications", "audit_log")}
+        "escalations", "notifications", "risk_assessments", "interventions", "intervention_outcomes", "audit_log")}
 
 
 __all__ = ["generate", "load", "SEED_NOW", "IST"]

@@ -275,11 +275,12 @@ def _fire(conn: Conn, now: datetime, today: date, it: dict, alert_id: int, membe
     return {"notified": notified, "escalation": kind == "escalation"}
 
 
-def run_alert_tick(conn: Conn, now: datetime, resolve: bool = True) -> dict:
+def run_alert_tick(conn: Conn, now: datetime, resolve: bool = True, assess_if_missing: bool = False) -> dict:
     """Evaluate every open item against the rules at simulated time `now`. Safe to call any number of times.
 
     `resolve=False` skips the escalation clean-up; the clock advance uses it for the days after the
-    first, because time passing alone never closes an item."""
+    first, because time passing alone never closes an item. The same pass runs the delay-risk assessment
+    (once per simulated day when `assess_if_missing`, which the /api/live poll uses)."""
     conn.run("SELECT pg_advisory_xact_lock(%s)", (TICK_LOCK,))
     today = ist_date(now)
     delivery = notifications.progress_outbox(conn, now)
@@ -315,8 +316,12 @@ def run_alert_tick(conn: Conn, now: datetime, resolve: bool = True) -> dict:
     if any(delivery.values()):
         record(conn, at=now, actor=None, action="outbox.delivery_updated", entity_type="outbox", entity_id="batch",
                details={**delivery, "simulated": True})
+    # local import: intelligence uses the workflow engine, which itself imports from here
+    from app import intelligence
+
+    insight = intelligence.on_tick(conn, now, only_if_missing=assess_if_missing)
     conn.defer("UPDATE platform_clock SET last_tick_sim = %s, last_tick_wall = clock_timestamp() WHERE id = 1", (now,))
-    return {**fired, "delivery": delivery, "today": today.isoformat()}
+    return {**fired, "delivery": delivery, "today": today.isoformat(), "intelligence": insight}
 
 
 def maybe_tick(conn: Conn) -> dict | None:
@@ -334,4 +339,4 @@ def maybe_tick(conn: Conn) -> dict | None:
         return None
     from app.clock import IST
 
-    return run_alert_tick(conn, row["sim_now"].astimezone(IST))
+    return run_alert_tick(conn, row["sim_now"].astimezone(IST), assess_if_missing=True)

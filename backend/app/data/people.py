@@ -134,3 +134,9 @@ UNDERTAKING_CONDITIONS = [
     "Submit the audited accounts of the trust for the last financial year.",
     "Operationalise the girls' hostel and upload the occupancy certificate.",
 ]
+
+DISMISS_REASONS = [
+    "The officer is already following this up by phone with the institution.",
+    "The current reviewer will finish this case this week; reassigning would lose time.",
+    "The delay is expected and agreed with the institution; no action needed now.",
+]
