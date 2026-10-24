@@ -121,8 +121,12 @@ def institution_home(conn: Conn, now: datetime, institution_id: int) -> dict:
             actions.append({"kind": "document", "title": f"Upload renewed {d['title']}",
                             "due_date": d["expires_on"], "days_to_due": d["days_to_expiry"], "link": "/documents"})
     actions.sort(key=lambda a: a["days_to_due"])
+    from app.intelligence import institution_blockers
+
     return {
         "applications": apps, "pending_actions": actions, "deficiencies": deficiencies, "visits": visits,
+        # cases at risk because a reply from this institution is awaited ("Your reply is needed to avoid delay")
+        "blockers": institution_blockers(conn, now, institution_id),
         "undertakings": [u for u in unds if u["state"] != "closed"],
         "evidence_waiting": [u for u in unds if u["state"] == "awaiting_verification"],
         "documents_attention": [d for d in docs if d["state"] in ("expired", "expiring_soon", "renewal_submitted")],
@@ -160,6 +164,14 @@ def committee_cases(conn: Conn, now: datetime, user_id: int) -> dict:
            WHERE m.user_id = %s AND r.status <> 'cancelled' ORDER BY r.status DESC, s.due_at""", (user_id,))
     for r in reviews:
         r["days_to_due"] = (ist_date(r["due_at"]) - today).days
+    from app.intelligence import likely_delayed
+
+    late = likely_delayed(conn, now, [v["application_id"] for v in visits if v["status"] != "reviewed"]
+                          + [r["application_id"] for r in reviews if r["status"] == "pending"])
+    for v in visits:
+        v["likely_delayed"] = v["application_id"] in late
+    for r in reviews:
+        r["likely_delayed"] = r["application_id"] in late
     return {
         "visits": visits, "reviews": reviews,
         "counts": {"visits_open": sum(v["status"] != "reviewed" for v in visits),

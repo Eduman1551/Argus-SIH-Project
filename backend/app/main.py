@@ -9,6 +9,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from app.api.intelligence import router as intelligence_router
 from app.api.routes import router
 from app.auth import NotSignedIn
 from app.common import DomainError
@@ -26,6 +27,7 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
 )
 app.include_router(router)
+app.include_router(intelligence_router)
 
 
 @app.exception_handler(DomainError)

@@ -116,6 +116,16 @@ def case_summary(facts: dict, use_llm: bool = False) -> tuple[str, str]:
     return base, "template"
 
 
+def reword(sentence: str) -> tuple[str, str]:
+    """Reword a risk summary in plain language with the AI helper; the template sentence otherwise.
+    Returns (text, source). Dates, numbers and the case reference must survive unchanged."""
+    text = _complete("Reword this sentence for a busy government officer, in one or two plain sentences. Keep every "
+                     "date, number and reference exactly as written. Do not add advice.\n\n" + sentence, max_tokens=200)
+    if text and len(text) < 600:
+        return text.strip(), "llm"
+    return sentence, "template"
+
+
 # ------------------------------------------------------------------ letters
 LETTER_LABEL = "SYNTHETIC DATA - prototype draft, not an official AICTE letter"
 
