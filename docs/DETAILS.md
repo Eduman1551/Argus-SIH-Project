@@ -82,7 +82,7 @@ expected decision -> request the renewed document. Only Medium and High cases ge
 estimated days saved wins; a dismissed rule is not suggested again for 14 days. Each rule edit bumps its version, and a
 recommendation keeps the version it came from.
 
-**Approve / dismiss.** `POST /api/interventions/{id}/approve` runs the action through the existing engine functions
+**Approve / dismiss.** `POST /api/interventions/{id}/accept` (the Approve button) runs the action through the existing engine functions
 (their permission checks apply too); `POST /api/interventions/{id}/dismiss` needs a reason. Who may act: `regional`
 (officials of the case's Region), `regional_or_bureau`, `bureau`. Everyone else gets 403.
 
@@ -94,7 +94,7 @@ scripted institutions and officers responded (for example a reply 2 to 4 days af
 show how the method behaves on this data, not real-world impact.
 
 **Endpoints.** `GET /api/intelligence/overview|watchlist|bottlenecks|recommendations|metrics`,
-`GET /api/applications/{id}/risk|assessments|summary-wording`, `POST /api/interventions/{id}/approve|dismiss`,
+`GET /api/applications/{id}/risk|assessments|summary-wording`, `POST /api/interventions/{id}/accept|dismiss`,
 `PUT /api/rules/risk-factors/{code}`, `PUT /api/rules/interventions/{code}`. Migration: `pnpm db:seed` reloads the schema
 and the regenerated dataset.
 
@@ -150,16 +150,21 @@ suggestions, not official requirements. Every value is computed live on the Perf
 | # | KPI | Result | Suggested target |
 |---|---|---|---|
 | 1 | Workflow routing accuracy (61 applications) | 100% | 100% |
-| 2 | Alert timeliness (462 alerts, fired on their configured day) | 100% | 100% |
-| 3 | Deadline tracking reliability (38 open overdue items checked) | 0 missed | 0 |
-| 4 | Pendency visibility (31 overdue cases on dashboard and report) | 100% | 100% |
-| 5 | Manual follow-up reduction (285 reminders, 57 overdue alerts, 120 escalations; 1 follow-up per alert assumed) | 462 | shown as a count |
-| 6 | Escalation coverage (38 overdue items) | 100% | 100% |
-| 7 | Audit completeness (1,078 records) and chain verification | 100%, chain valid | 100%, valid |
-| 8 | Average days per stage, AICTE + institution | Completeness 3.5 + 1.2 · Scrutiny 11.2 + 3.5 · EVC 29.5 · SAC/SHC 7.9 · Decision 3.6 | shown |
+| 2 | Alert timeliness (472 alerts, fired on their configured day) | 100% | 100% |
+| 3 | Deadline tracking reliability (37 open overdue items checked) | 0 missed | 0 |
+| 4 | Pendency visibility (30 overdue cases on dashboard and report) | 100% | 100% |
+| 5 | Manual follow-up reduction (290 reminders, 62 overdue alerts, 120 escalations; 1 follow-up per alert assumed) | 472 | shown as a count |
+| 6 | Escalation coverage (37 overdue items) | 100% | 100% |
+| 7 | Audit completeness (1,101 records) and chain verification | 100%, chain valid | 100%, valid |
+| 8 | Average days per stage, AICTE + institution | Completeness 3.4 + 1.2 · Scrutiny 10.8 + 3.4 · EVC 29.9 · SAC/SHC 7.9 · Decision 3.7 | shown |
 
 The routing self-test on the Performance page also pushes one test application of every type through all its
 stages inside a rolled-back transaction: 7 of 7 routed correctly.
+
+Intelligence results on the seeded history (Performance page, after Reset): 62% of approved actions lowered the
+risk band (28 of 45 measured), prediction accuracy 87% (33 of 38), false-alert rate 33% (3 of 9 cases flagged High that
+finished on time). The average days saved is small (about 0.1) because most seeded responses only partly help; these
+come from scripted synthetic participants, not real-world impact.
 
 ## Screenshots
 
