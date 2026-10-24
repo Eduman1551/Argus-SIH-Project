@@ -140,6 +140,15 @@ await step("audit chain verifies", async () => {
   await expectText("Chain intact");
 });
 
+await step("official approves a recommended action on an at-risk case", async () => {
+  await as("off-NR-1");
+  const at = await (await page.request.get(`${base}/api/applications?q=NR/0047`)).json();
+  await page.goto(`${base}/applications/${at.rows[0].id}`);
+  await page.getByRole("heading", { name: "Why at risk" }).waitFor();
+  await page.locator("#recommendation").getByRole("button", { name: "Approve" }).click();
+  await expectText(/^Approved\./);
+});
+
 await step("log out; pages and APIs refuse; log back in as another role", async () => {
   await as("inst-AMB");
   await page.goto(`${base}/`);
