@@ -27,7 +27,8 @@
     "screens:roles": "node scripts/role-tour.mjs",
     "e2e": "node scripts/e2e.mjs",
     "reset:live": "node scripts/reset-live.mjs",
-    "live-test": "node scripts/live-test.mjs"
+    "live-test": "node scripts/live-test.mjs",
+    "shots:prod": "node scripts/prod-shots.mjs"
   },
   "devDependencies": {
     "concurrently": "10.0.6",

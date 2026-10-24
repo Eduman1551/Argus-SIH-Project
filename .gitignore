@@ -22,7 +22,8 @@ next-env.d.ts
 
 # build and test output
 .vercel/
-/screenshots/
+/screenshots/*
+!/screenshots/production/
 *.log
 
 .vercel
